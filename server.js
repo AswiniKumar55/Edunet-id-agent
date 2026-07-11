@@ -5,7 +5,7 @@ const cors       = require("cors");
 const fs         = require("fs");
 const path       = require("path");
 const nodemailer = require("nodemailer");
-const https      = require("https");
+const { Resend }  = require("resend");
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -410,46 +410,19 @@ app.post("/api/ai", async (req, res) => {
   }
 });
 
-// ── Email helpers ─────────────────────────────────────
-function makeTransporter(port, secure) {
-  return nodemailer.createTransport({
-    host              : "smtp.gmail.com",
-    port,
-    secure,
-    auth              : { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
-    tls               : { rejectUnauthorized: false },
-    connectionTimeout : 30000,
-    greetingTimeout   : 30000,
-    socketTimeout     : 45000
-  });
-}
+// ── Send Email via Resend (HTTPS — works on all hosts) ─
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-function buildMailOptions(toName, toEmail, ids) {
+app.post("/api/send-email", async (req, res) => {
+  const { toName, toEmail, ids } = req.body;
+  if (!toName || !toEmail || !ids || !ids.length)
+    return res.status(400).json({ error: "toName, toEmail and ids are required." });
+
   const credLines = ids.map((id, i) =>
-    `${i + 1}. Mail     : ${id.email}\n   Password : ${id.password}`
-  ).join("\n\n");
+    `${i + 1}. Mail: ${id.email}  |  Password: ${id.password}`
+  ).join("\n");
 
-  return {
-    from   : `"Edunet Admin" <${process.env.GMAIL_USER}>`,
-    to     : toEmail,
-    subject: `Your ${ids.length} Edunet IBM SkillsBuild Login Credential${ids.length > 1 ? "s" : ""}`,
-    text   :
-`Dear ${toName},
-
-Please find your Edunet IBM SkillsBuild login credentials assigned exclusively to you.
-Do NOT share these credentials with anyone.
-
-─────────────────────────────────────
-${credLines}
-─────────────────────────────────────
-
-Login Portal : https://www.edunetworks.in/
-Support      : support@edunetworks.in
-
-Best regards,
-Edunet Admin Team`,
-
-    html   : `
+  const html = `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
   <div style="background:#1a1f2e;padding:24px 28px">
     <h2 style="color:#fff;margin:0;font-size:20px">🎓 Edunet IBM SkillsBuild</h2>
@@ -487,39 +460,26 @@ Edunet Admin Team`,
   <div style="background:#f7f8fa;padding:12px 28px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
     This is an automated message. Please do not reply to this email.
   </div>
-</div>`
-  };
-}
+</div>`;
 
-// ── Send Email endpoint — tries port 465 then 587 ─────
-app.post("/api/send-email", async (req, res) => {
-  const { toName, toEmail, ids } = req.body;
-  if (!toName || !toEmail || !ids || !ids.length)
-    return res.status(400).json({ error: "toName, toEmail and ids are required." });
-
-  const mailOptions = buildMailOptions(toName, toEmail, ids);
-
-  // Try port 465 (SSL) first, then fall back to 587 (STARTTLS)
-  const attempts = [
-    { port: 465, secure: true  },
-    { port: 587, secure: false }
-  ];
-
-  let lastError = null;
-  for (const { port, secure } of attempts) {
-    try {
-      const t = makeTransporter(port, secure);
-      await t.sendMail(mailOptions);
-      console.log(`✅ Email sent via port ${port} to ${toEmail}`);
-      return res.json({ success: true, message: `Email sent to ${toEmail}` });
-    } catch (e) {
-      console.error(`❌ Port ${port} failed: ${e.message}`);
-      lastError = e;
+  try {
+    const { data, error } = await resend.emails.send({
+      from   : "Edunet Admin <onboarding@resend.dev>",
+      to     : [toEmail],
+      subject: `Your ${ids.length} Edunet IBM SkillsBuild Login Credential${ids.length > 1 ? "s" : ""}`,
+      html,
+      text   : `Dear ${toName},\n\nYour Edunet IBM SkillsBuild credentials:\n\n${credLines}\n\nLogin: https://www.edunetworks.in/\n\nEdunet Admin Team`
+    });
+    if (error) {
+      console.error("❌ Resend error:", error);
+      return res.status(500).json({ error: error.message });
     }
+    console.log("✅ Email sent via Resend to", toEmail, "| ID:", data.id);
+    res.json({ success: true, message: `Email sent to ${toEmail}` });
+  } catch (e) {
+    console.error("❌ Resend exception:", e.message);
+    res.status(500).json({ error: e.message });
   }
-
-  // Both ports failed — return the actual error so we can debug
-  res.status(500).json({ error: lastError.message });
 });
 
 // ── SPA fallback ──────────────────────────────────────
