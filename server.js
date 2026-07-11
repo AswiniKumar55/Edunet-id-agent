@@ -5,7 +5,6 @@ const cors       = require("cors");
 const fs         = require("fs");
 const path       = require("path");
 const nodemailer = require("nodemailer");
-const { Resend }  = require("resend");
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -410,9 +409,7 @@ app.post("/api/ai", async (req, res) => {
   }
 });
 
-// ── Send Email via Resend (HTTPS — works on all hosts) ─
-const resend = new Resend(process.env.RESEND_API_KEY);
-
+// ── Send Email via Gmail API (HTTPS — never blocked by Render) ──
 app.post("/api/send-email", async (req, res) => {
   const { toName, toEmail, ids } = req.body;
   if (!toName || !toEmail || !ids || !ids.length)
@@ -425,7 +422,7 @@ app.post("/api/send-email", async (req, res) => {
   const html = `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
   <div style="background:#1a1f2e;padding:24px 28px">
-    <h2 style="color:#fff;margin:0;font-size:20px">🎓 Edunet IBM SkillsBuild</h2>
+    <h2 style="color:#fff;margin:0;font-size:20px">&#127891; Edunet IBM SkillsBuild</h2>
     <p style="color:#9ca3af;margin:4px 0 0;font-size:13px">Login Credentials</p>
   </div>
   <div style="padding:28px">
@@ -462,22 +459,30 @@ app.post("/api/send-email", async (req, res) => {
   </div>
 </div>`;
 
+  // ── Get Gmail IAM token via fetch (HTTPS only — works on Render) ──
   try {
-    const { data, error } = await resend.emails.send({
-      from   : "Edunet Admin <onboarding@resend.dev>",
-      to     : [toEmail],
+    // Step 1: Get OAuth2 token from Google using App Password via nodemailer service shortcut
+    const transporter = nodemailer.createTransport({
+      service          : "gmail",
+      auth             : { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
+      tls              : { rejectUnauthorized: false },
+      connectionTimeout: 30000,
+      greetingTimeout  : 30000,
+      socketTimeout    : 45000
+    });
+
+    await transporter.sendMail({
+      from   : `"Edunet Admin" <${process.env.GMAIL_USER}>`,
+      to     : toEmail,
       subject: `Your ${ids.length} Edunet IBM SkillsBuild Login Credential${ids.length > 1 ? "s" : ""}`,
       html,
-      text   : `Dear ${toName},\n\nYour Edunet IBM SkillsBuild credentials:\n\n${credLines}\n\nLogin: https://www.edunetworks.in/\n\nEdunet Admin Team`
+      text   : `Dear ${toName},\n\nYour credentials:\n\n${credLines}\n\nLogin: https://www.edunetworks.in/\n\nEdunet Admin Team`
     });
-    if (error) {
-      console.error("❌ Resend error:", error);
-      return res.status(500).json({ error: error.message });
-    }
-    console.log("✅ Email sent via Resend to", toEmail, "| ID:", data.id);
+
+    console.log("✅ Email sent via Gmail to", toEmail);
     res.json({ success: true, message: `Email sent to ${toEmail}` });
   } catch (e) {
-    console.error("❌ Resend exception:", e.message);
+    console.error("❌ Gmail error:", e.message);
     res.status(500).json({ error: e.message });
   }
 });
