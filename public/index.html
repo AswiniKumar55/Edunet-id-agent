@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Edunet ID Agent</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.6;background:#f0f2f5;color:#1f2328}
+
+/* ── LOGIN ── */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#1a1f2e 0%,#2d3748 100%)}
+.login-card{background:#fff;border-radius:14px;padding:40px 40px 44px;width:420px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.25)}
+.login-logo{margin-bottom:16px;display:flex;justify-content:center}
+.login-logo img{width:160px;height:auto}
+.login-card h1{font-size:22px;font-weight:800;margin-bottom:4px;color:#1f2328}
+.login-card p{color:#57606a;font-size:13px;margin-bottom:28px}
+.login-card input{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;margin-bottom:12px;outline:none;transition:border .15s}
+.login-card input:focus{border-color:#3b82d4}
+.login-err{color:#dc2626;font-size:13px;margin-top:6px}
+.login-hint{font-size:11px;color:#9ca3af;margin-top:12px}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:#3b82d4;color:#fff}.btn-primary:hover:not(:disabled){background:#2563eb}
+.btn-secondary{background:#f0f1f3;color:#1f2328;border:1px solid #e5e7eb}.btn-secondary:hover:not(:disabled){background:#e5e7eb}
+.btn-green{background:#16a34a;color:#fff}.btn-green:hover:not(:disabled){background:#15803d}
+.btn-red{background:#dc2626;color:#fff}.btn-red:hover:not(:disabled){background:#b91c1c}
+.btn-orange{background:#ea580c;color:#fff}.btn-orange:hover:not(:disabled){background:#c2410c}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:6px}
+.btn-xs{padding:4px 9px;font-size:11px;border-radius:5px}
+.btn-full{width:100%}
+
+/* ── APP SHELL ── */
+#app{display:none;flex-direction:column;height:100vh;overflow:hidden}
+
+/* ── TOP BAR ── */
+.topbar{background:#1a1f2e;color:#fff;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:68px;flex-shrink:0;z-index:50}
+.topbar-brand{display:flex;align-items:center;gap:12px}
+.topbar-brand span{font-size:17px;font-weight:800;letter-spacing:.2px}
+.topbar-logo{height:54px;width:auto;border-radius:6px;background:#fff;padding:4px 10px;object-fit:contain}
+.topbar-pills{display:flex;gap:8px}
+.pill{background:rgba(255,255,255,.1);color:#d1d5db;font-size:11px;padding:3px 10px;border-radius:10px;font-weight:600}
+.pill.green{background:#16a34a}
+.pill.red{background:#dc2626}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.topbar-user{font-size:13px;color:#9ca3af}
+.logout-btn{background:transparent;border:1px solid #374151;color:#d1d5db;padding:5px 13px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600}
+.logout-btn:hover{background:#374151}
+
+/* ── TABS ── */
+.tabs{background:#fff;border-bottom:2px solid #e5e7eb;display:flex;gap:0;padding:0 24px;flex-shrink:0}
+.tab{padding:12px 20px;font-size:13px;font-weight:600;color:#57606a;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;display:flex;align-items:center;gap:7px;transition:color .15s}
+.tab:hover{color:#1f2328}
+.tab.active{color:#3b82d4;border-bottom-color:#3b82d4}
+.tab-badge{background:#e5e7eb;color:#57606a;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700}
+.tab.active .tab-badge{background:#dbeafe;color:#3b82d4}
+
+/* ── TAB CONTENT ── */
+.tab-content{flex:1;overflow:hidden;display:flex}
+.tab-pane{display:none;width:100%;overflow-y:auto}
+.tab-pane.active{display:flex}
+
+/* ═══════════════ AGENT TAB ═══════════════ */
+#tab-agent{flex-direction:row}
+
+/* CHAT SIDEBAR */
+.chat-sidebar{width:300px;background:#fff;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;flex-shrink:0}
+.chat-sidebar-header{padding:16px;border-bottom:1px solid #e5e7eb}
+.chat-sidebar-header h3{font-size:13px;font-weight:700;color:#1f2328;margin-bottom:12px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.stat-card{background:#f7f8fa;border:1px solid #e5e7eb;border-radius:8px;padding:10px 8px;text-align:center}
+.stat-card .n{font-size:22px;font-weight:800;line-height:1.1}
+.stat-card .l{font-size:10px;color:#57606a;margin-top:2px;text-transform:uppercase;letter-spacing:.3px}
+.stat-card.blue .n{color:#3b82d4}
+.stat-card.green .n{color:#16a34a}
+.stat-card.red .n{color:#dc2626}
+.stat-card.purple .n{color:#7c5cd8}
+.chat-quick{padding:12px 16px;border-bottom:1px solid #e5e7eb}
+.chat-quick h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#57606a;margin-bottom:8px}
+.quick-btn{display:block;width:100%;text-align:left;padding:7px 10px;margin-bottom:5px;background:#f7f8fa;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;cursor:pointer;color:#1f2328;transition:all .15s}
+.quick-btn:hover{background:#dbeafe;border-color:#93c5fd;color:#1e40af}
+.emp-quick-list{padding:12px 16px;flex:1;overflow-y:auto}
+.emp-quick-list h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#57606a;margin-bottom:8px}
+.emp-chip{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;margin-bottom:5px;background:#f7f8fa;border:1px solid #e5e7eb;border-radius:6px;cursor:pointer;transition:all .15s}
+.emp-chip:hover{background:#dcfce7;border-color:#86efac}
+.emp-chip .ec-name{font-size:12px;font-weight:600;color:#1f2328}
+.emp-chip .ec-email{font-size:10px;color:#57606a;margin-top:1px}
+.emp-chip .ec-sel{font-size:11px;color:#16a34a;font-weight:700;display:none}
+.emp-chip.selected{background:#dcfce7;border-color:#16a34a}
+.emp-chip.selected .ec-sel{display:block}
+
+/* CHAT MAIN */
+.chat-main{flex:1;display:flex;flex-direction:column;background:#f7f8fa;min-width:0}
+.chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+.msg{display:flex;gap:10px;max-width:82%}
+.msg.user{align-self:flex-end;flex-direction:row-reverse}
+.msg-avatar{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;background:#e5e7eb}
+.msg.agent .msg-avatar{background:#1a1f2e;color:#fff}
+.msg-bubble{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.6;color:#1f2328}
+.msg.user .msg-bubble{background:#3b82d4;color:#fff;border-color:#3b82d4}
+.msg-time{font-size:10px;color:#9ca3af;margin-top:3px}
+.msg.user .msg-time{text-align:right}
+.msg-action-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-top:8px}
+.msg-action-card .card-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#57606a;margin-bottom:8px}
+.allocated-ids{max-height:180px;overflow-y:auto;font-size:12px;font-family:monospace;background:#f7f8fa;border:1px solid #e5e7eb;border-radius:6px;padding:8px}
+.allocated-id-row{padding:3px 0;border-bottom:1px solid #f0f1f3;color:#1f2328}
+.allocated-id-row:last-child{border:none}
+.card-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.asking-badge{display:flex;align-items:center;gap:8px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:13px;color:#92400e}
+.asking-badge .dot{width:8px;height:8px;border-radius:50%;background:#f59e0b;animation:pulse 1s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.typing-dots span{display:inline-block;width:7px;height:7px;border-radius:50%;background:#57606a;margin:0 2px;animation:bounce .9s ease infinite}
+.typing-dots span:nth-child(2){animation-delay:.15s}
+.typing-dots span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+
+/* CHAT INPUT */
+.chat-input-area{padding:16px 20px;background:#fff;border-top:1px solid #e5e7eb}
+.chat-input-row{display:flex;gap:10px;align-items:flex-end}
+.chat-input-row textarea{flex:1;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;outline:none;resize:none;line-height:1.5;max-height:100px;transition:border .15s}
+.chat-input-row textarea:focus{border-color:#3b82d4}
+.chat-input-hint{font-size:11px;color:#9ca3af;margin-top:6px}
+.selected-emp-badge{display:inline-flex;align-items:center;gap:6px;background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;color:#15803d;margin-bottom:8px}
+
+/* ═══════════════ EMPLOYEES TAB ═══════════════ */
+#tab-employees{padding:24px;flex-direction:column;gap:18px}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.page-header h2{font-size:18px;font-weight:700}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-head h3{font-size:14px;font-weight:700}
+.form-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-label{font-size:12px;font-weight:600;color:#57606a}
+.form-input{padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;outline:none;transition:border .15s}
+.form-input:focus{border-color:#3b82d4}
+.emp-table{width:100%;border-collapse:collapse;font-size:13px}
+.emp-table th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#57606a;border-bottom:2px solid #e5e7eb;background:#f7f8fa}
+.emp-table td{padding:11px 12px;border-bottom:1px solid #f0f1f3;vertical-align:middle}
+.emp-table tr:last-child td{border-bottom:none}
+.emp-table tr:hover td{background:#f7f8fa}
+.emp-avatar{width:32px;height:32px;border-radius:50%;background:#dbeafe;color:#3b82d4;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;margin-right:8px}
+.inline-edit{display:none;gap:6px;align-items:center}
+.inline-edit.show{display:flex}
+.inline-edit input{padding:5px 8px;border:1.5px solid #3b82d4;border-radius:6px;font-size:12px;outline:none;width:140px}
+
+/* ═══════════════ ID POOL TAB ═══════════════ */
+#tab-ids{padding:24px;flex-direction:column;gap:18px}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:2px}
+.toolbar input{padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;outline:none;width:240px;transition:border .15s}
+.toolbar input:focus{border-color:#3b82d4}
+.toolbar-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.badge{font-size:11px;padding:3px 9px;border-radius:10px;font-weight:700}
+.badge-used{background:#fee2e2;color:#dc2626}
+.badge-avail{background:#dcfce7;color:#16a34a}
+.id-table{width:100%;border-collapse:collapse;font-size:13px}
+.id-table th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#57606a;border-bottom:2px solid #e5e7eb;background:#f7f8fa}
+.id-table td{padding:10px 12px;border-bottom:1px solid #f0f1f3;vertical-align:middle}
+.id-table tr:last-child td{border-bottom:none}
+tr.row-used td{background:#fff5f5}
+tr.row-used .email-col{text-decoration:line-through;color:#dc2626;font-weight:600}
+tr.row-used .pass-col{color:#dc2626}
+tr.row-avail .email-col{color:#1f2328}
+.pagination{display:flex;gap:5px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.pg-btn{padding:5px 11px;border:1px solid #e5e7eb;border-radius:6px;background:#fff;font-size:12px;cursor:pointer;font-weight:600;transition:all .15s}
+.pg-btn:hover{background:#f0f1f3}
+.pg-btn.active{background:#3b82d4;color:#fff;border-color:#3b82d4}
+.pg-info{font-size:12px;color:#57606a;margin-left:6px}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:24px;right:24px;padding:12px 18px;border-radius:9px;font-size:13px;font-weight:600;z-index:9999;display:none;max-width:340px;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+#toast.ok{background:#16a34a;color:#fff}
+#toast.err{background:#dc2626;color:#fff}
+#toast.info{background:#1a1f2e;color:#fff}
+
+/* ── MISC ── */
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty-state{text-align:center;padding:40px 20px;color:#57606a;font-size:13px}
+footer{text-align:center;font-size:12px;color:#9ca3af;padding:12px;border-top:1px solid #e5e7eb;background:#fff;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<!-- ═══════ LOGIN ═══════ -->
+<div id="login-screen">
+<div class="login-card">
+  <div class="login-logo">
+    <img src="/edunetfoundation_logo.jpg" alt="Edunet Foundation" style="width:260px;height:auto;border-radius:8px"/>
+  </div>
+  <h1>Edunet ID Agent</h1>
+  <p>Admin portal — sign in to manage &amp; allocate credentials</p>
+  <input type="text"     id="l-user" placeholder="Username" value="admin" autocomplete="username"/>
+  <input type="password" id="l-pass" placeholder="Password"
+         onkeydown="if(event.key==='Enter')login()" autocomplete="current-password"/>
+  <button class="btn btn-primary btn-full" onclick="login()" style="margin-top:4px">Sign In →</button>
+  <div style="display:flex;align-items:center;gap:8px;margin:14px 0 10px">
+    <div style="flex:1;height:1px;background:#e5e7eb"></div>
+    <span style="font-size:11px;color:#9ca3af">or sign in with</span>
+    <div style="flex:1;height:1px;background:#e5e7eb"></div>
+  </div>
+  <!-- Google Sign-In — captures real name for "Assigned By" in reports -->
+  <div id="g_id_onload"
+       data-client_id="986906180547-6lmlknb4dh4gc1njdpetge0uvlf5bogi.apps.googleusercontent.com"
+       data-callback="handleGoogleLogin"
+       data-auto_select="false"
+       data-itp_support="true">
+  </div>
+  <div class="g_id_signin"
+       data-type="standard"
+       data-shape="rectangular"
+       data-theme="outline"
+       data-text="signin_with"
+       data-size="large"
+       data-logo_alignment="left"
+       style="display:flex;justify-content:center">
+  </div>
+  <div class="login-err" id="l-err"></div>
+  <p class="login-hint">Google login captures your real name for reports.</p>
+</div>
+</div>
+
+<!-- ═══════ APP ═══════ -->
+<div id="app">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="topbar-brand">
+      <img src="/edunetfoundation_logo.jpg" alt="Edunet Foundation" class="topbar-logo"/>
+      <span>⚡ Edunet ID Agent</span>
+      <div class="topbar-pills">
+        <span class="pill green" id="tb-avail">— avail</span>
+        <span class="pill red"   id="tb-used">— used</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="topbar-user" id="tb-user"></span>
+      <button class="logout-btn" onclick="logout()">Sign Out</button>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('agent')"    id="t-agent">
+      🤖 AI Agent
+    </div>
+    <div class="tab"        onclick="switchTab('employees')" id="t-employees">
+      👥 Employees <span class="tab-badge" id="emp-count-badge">0</span>
+    </div>
+    <div class="tab"        onclick="switchTab('ids')"       id="t-ids">
+      🗂 ID Pool <span class="tab-badge" id="id-count-badge">0</span>
+    </div>
+    <div class="tab"        onclick="switchTab('reports')"   id="t-reports">
+      📊 Reports
+    </div>
+  </div>
+
+  <!-- TAB CONTENT -->
+  <div class="tab-content">
+
+    <!-- ═══ AGENT TAB ═══ -->
+    <div class="tab-pane active" id="tab-agent">
+
+      <!-- Left sidebar -->
+      <div class="chat-sidebar">
+        <div class="chat-sidebar-header">
+          <h3>📊 Pool Status</h3>
+          <div class="stat-grid">
+            <div class="stat-card blue"><div class="n" id="s-total">—</div><div class="l">Total</div></div>
+            <div class="stat-card green"><div class="n" id="s-avail">—</div><div class="l">Available</div></div>
+            <div class="stat-card red"><div class="n" id="s-used">—</div><div class="l">Used</div></div>
+            <div class="stat-card purple"><div class="n" id="s-alloc">—</div><div class="l">Allocations</div></div>
+          </div>
+          <button class="btn btn-secondary btn-sm btn-full" onclick="reloadExcel()" style="margin-top:4px">🔄 Reload Excel</button>
+        </div>
+
+        <div class="chat-quick">
+          <h4>Quick Commands</h4>
+          <button class="quick-btn" onclick="fillChat('Assign 5 ids to [name]')">Assign 5 IDs →</button>
+          <button class="quick-btn" onclick="fillChat('Assign 10 ids to [name]')">Assign 10 IDs →</button>
+          <button class="quick-btn" onclick="fillChat('How many IDs are available?')">Check availability →</button>
+          <button class="quick-btn" onclick="fillChat('Show allocation history')">Show history →</button>
+        </div>
+
+        <div class="emp-quick-list">
+          <h4>Click Employee to Select</h4>
+          <div id="emp-chips"></div>
+        </div>
+      </div>
+
+      <!-- Chat area -->
+      <div class="chat-main">
+        <div class="chat-messages" id="chat-messages">
+          <div class="msg agent">
+            <div class="msg-avatar">🤖</div>
+            <div>
+              <div class="msg-bubble">
+                👋 Hello! I'm your <strong>Edunet ID Allocation Agent</strong>.<br><br>
+                You can say things like:<br>
+                • <em>"Assign 10 ids to Priya"</em><br>
+                • <em>"Give 5 ids to Ravi via ravi@company.com"</em><br>
+                • <em>"How many IDs are available?"</em><br><br>
+                <strong>Tip:</strong> Click an employee from the left panel to auto-select them, then just say <em>"Assign 5 ids"</em>!
+              </div>
+              <div class="msg-time">Just now</div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <div id="selected-emp-bar" style="display:none">
+            <span class="selected-emp-badge">✅ <span id="sel-emp-label"></span> <button onclick="clearSelectedEmp()" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:13px;margin-left:4px">✕</button></span>
+          </div>
+          <div class="chat-input-row">
+            <textarea id="chat-inp" rows="1" placeholder='Type: "Assign 10 ids to Priya" or select an employee and say "Assign 10 ids"'
+              onkeydown="handleChatKey(event)" oninput="autoResize(this)"></textarea>
+            <button class="btn btn-primary" id="chat-send-btn" onclick="sendChat()">Send ↑</button>
+          </div>
+          <div class="chat-input-hint">Press Enter to send · Shift+Enter for new line</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ EMPLOYEES TAB ═══ -->
+    <div class="tab-pane" id="tab-employees">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head">
+          <h3>Add New Employee</h3>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input class="form-input" type="text" id="emp-name" placeholder="e.g. Priya Sharma" onkeydown="if(event.key==='Enter')addEmployee()"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input class="form-input" type="email" id="emp-email" placeholder="priya@company.com" onkeydown="if(event.key==='Enter')addEmployee()"/>
+          </div>
+          <button class="btn btn-primary" onclick="addEmployee()" id="add-emp-btn" style="margin-bottom:1px">+ Add</button>
+        </div>
+      </div>
+
+      <div class="card" style="flex:1">
+        <div class="card-head">
+          <h3>Employee Directory</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="form-input" type="text" id="emp-search" placeholder="Search…" style="width:180px;padding:7px 11px;font-size:12px" oninput="renderEmployees()"/>
+          </div>
+        </div>
+        <table class="emp-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Employee Name</th>
+              <th>Email</th>
+              <th>IDs Assigned</th>
+              <th>Last Allocation</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="emp-tbody"></tbody>
+        </table>
+        <div id="emp-empty" class="empty-state" style="display:none">No employees yet. Add one above.</div>
+      </div>
+    </div>
+
+    <!-- ═══ ID POOL TAB ═══ -->
+    <div class="tab-pane" id="tab-ids">
+
+      <!-- ── Add More IDs card ── -->
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head" style="margin-bottom:10px">
+          <h3>➕ Add More Edunet IDs</h3>
+          <button class="btn btn-secondary btn-sm" id="toggle-add-ids-btn">▼ Expand</button>
+        </div>
+        <div id="add-ids-panel" style="display:none">
+          <!-- Two ways: upload Excel OR manual paste -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+            <!-- Left: Upload new Excel -->
+            <div style="background:#f7f8fa;border:1px solid #e5e7eb;border-radius:8px;padding:16px">
+              <div style="font-size:12px;font-weight:700;color:#57606a;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">📂 Upload Excel File</div>
+              <p style="font-size:12px;color:#57606a;margin-bottom:10px">Upload a new <code>.xlsx</code> file with additional IDs. Duplicate emails are automatically skipped.</p>
+              <p style="font-size:11px;color:#9ca3af;margin-bottom:10px">Expected columns: <strong>S.NO</strong>, <strong>Edunet mail id</strong>, <strong>Password</strong></p>
+              <label style="display:flex;flex-direction:column;gap:8px">
+                <input type="file" id="xlsx-upload" accept=".xlsx,.xls" style="font-size:13px;padding:6px;border:1.5px dashed #93c5fd;border-radius:6px;background:#fff;cursor:pointer"/>
+              </label>
+              <button class="btn btn-primary btn-sm" id="upload-xlsx-btn" style="margin-top:10px;width:100%">⬆ Upload &amp; Add IDs</button>
+              <div id="upload-status" style="margin-top:8px;font-size:12px"></div>
+            </div>
+
+            <!-- Right: Manual entry -->
+            <div style="background:#f7f8fa;border:1px solid #e5e7eb;border-radius:8px;padding:16px">
+              <div style="font-size:12px;font-weight:700;color:#57606a;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">⌨ Manual Entry</div>
+              <p style="font-size:12px;color:#57606a;margin-bottom:10px">Paste IDs one per line in the format:<br><code style="background:#e5e7eb;padding:1px 5px;border-radius:3px">email@edunetmail.com , Password</code></p>
+              <textarea id="manual-ids-input" rows="6"
+                style="width:100%;padding:9px 11px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:12px;font-family:monospace;outline:none;resize:vertical;line-height:1.6"
+                placeholder="EFIBM26B2967086337@edunetmail.com , Edu#566442&#10;EFIBM26B2801053701@edunetmail.com , Edu#201581&#10;..."></textarea>
+              <button class="btn btn-green btn-sm" id="add-manual-btn" style="margin-top:8px;width:100%">➕ Add These IDs</button>
+              <div id="manual-status" style="margin-top:8px;font-size:12px"></div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Bad IDs panel ── -->
+      <div class="card" id="bad-ids-card" style="display:none;border-color:#fca5a5;background:#fff5f5">
+        <div class="card-head" style="margin-bottom:10px">
+          <h3 style="color:#dc2626">⚠️ Broken IDs <span id="bad-ids-count" style="font-size:13px;font-weight:400;color:#dc2626"></span></h3>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-red btn-sm" id="delete-all-bad-btn">🗑 Delete All Broken IDs</button>
+            <button class="btn btn-secondary btn-sm" id="hide-bad-btn">✕ Hide</button>
+          </div>
+        </div>
+        <p style="font-size:12px;color:#57606a;margin-bottom:10px">These IDs have a blank email or blank password. Delete them here, then re-add them correctly using the <strong>Add More IDs</strong> panel above.</p>
+        <div style="overflow-x:auto">
+          <table class="id-table" style="font-size:12px">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="bad-select-all" title="Select all"/></th>
+                <th>#</th>
+                <th>Edunet Mail ID</th>
+                <th>Password</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="bad-ids-tbody"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+          <button class="btn btn-red btn-sm" id="delete-selected-bad-btn">🗑 Delete Selected</button>
+          <span id="bad-selected-count" style="font-size:12px;color:#57606a"></span>
+        </div>
+      </div>
+
+      <div class="card" style="flex:1">
+        <div class="card-head">
+          <h3>Edunet ID Pool</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+            <button class="btn btn-orange btn-sm" id="remove-blank-btn">🧹 Remove Blank Passwords</button>
+            <button class="btn btn-red btn-sm" onclick="resetAll()">↺ Reset All</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <input type="text" id="id-search" placeholder="Search email, employee…" oninput="renderIds()"/>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="chk-used" onchange="renderIds()"/> Used only
+          </label>
+          <span id="id-tbl-info" style="font-size:12px;color:#57606a"></span>
+          <div class="toolbar-right">
+            <button class="btn btn-orange btn-sm" id="show-bad-btn" style="display:none">⚠️ View Broken IDs</button>
+            <button class="btn btn-secondary btn-sm" onclick="reloadExcel()">🔄 Reload Excel</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="id-table">
+            <thead>
+              <tr>
+                <th style="width:32px"><input type="checkbox" id="pool-select-all" title="Select all"/></th>
+                <th>#</th>
+                <th>Edunet Mail ID</th>
+                <th>Password</th>
+                <th>Status</th>
+                <th>Assigned To</th>
+                <th>Employee Email</th>
+                <th>Date</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="id-tbody"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap" id="pool-bulk-bar">
+          <button class="btn btn-red btn-sm" id="delete-selected-pool-btn" style="display:none">🗑 Delete Selected</button>
+          <span id="pool-selected-count" style="font-size:12px;color:#57606a"></span>
+        </div>
+        <div class="pagination" id="id-pagination"></div>
+      </div>
+    </div>
+
+    <!-- ═══ REPORTS TAB ═══ -->
+    <div class="tab-pane" id="tab-reports" style="flex-direction:column;gap:18px;padding:24px;overflow-y:auto">
+
+      <!-- Filter bar -->
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head" style="margin-bottom:12px">
+          <h3>📊 Allocation Reports</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm rpt-period active-period" data-period="all">All Time</button>
+            <button class="btn btn-secondary btn-sm rpt-period" data-period="weekly">This Week</button>
+            <button class="btn btn-secondary btn-sm rpt-period" data-period="monthly">This Month</button>
+            <button class="btn btn-secondary btn-sm rpt-period" data-period="quarterly">This Quarter</button>
+            <button class="btn btn-secondary btn-sm rpt-period" data-period="custom">Custom Range</button>
+          </div>
+        </div>
+        <div id="custom-range-row" style="display:none;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+          <label style="font-size:12px;font-weight:600;color:#57606a">From:</label>
+          <input type="date" id="rpt-from" class="form-input" style="padding:7px 10px;font-size:12px;width:150px"/>
+          <label style="font-size:12px;font-weight:600;color:#57606a">To:</label>
+          <input type="date" id="rpt-to"   class="form-input" style="padding:7px 10px;font-size:12px;width:150px"/>
+          <button class="btn btn-primary btn-sm" id="rpt-apply-custom">Apply</button>
+        </div>
+        <div id="rpt-period-label" style="font-size:12px;color:#57606a"></div>
+      </div>
+
+      <!-- Summary cards -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <div class="stat-card blue" style="padding:14px 12px"><div class="n" id="rpt-total-allocs">—</div><div class="l">Total Allocations</div></div>
+        <div class="stat-card green" style="padding:14px 12px"><div class="n" id="rpt-total-ids">—</div><div class="l">IDs Assigned</div></div>
+        <div class="stat-card red" style="padding:14px 12px"><div class="n" id="rpt-total-deleted">—</div><div class="l">IDs Deleted</div></div>
+        <div class="stat-card purple" style="padding:14px 12px"><div class="n" id="rpt-total-assigners">—</div><div class="l">Assigned By (Users)</div></div>
+      </div>
+
+      <!-- By-Assigner summary -->
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><h3>👤 Activity by Admin/User</h3></div>
+        <table class="emp-table" id="rpt-assigner-table">
+          <thead><tr><th>#</th><th>Assigned By</th><th>Allocations Made</th><th>Total IDs Assigned</th></tr></thead>
+          <tbody id="rpt-assigner-tbody"></tbody>
+        </table>
+        <div id="rpt-assigner-empty" class="empty-state" style="display:none">No data for this period.</div>
+      </div>
+
+      <!-- Allocation detail table -->
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head">
+          <h3>📋 Allocation Details</h3>
+          <button class="btn btn-secondary btn-sm" id="rpt-export-alloc">⬇ Export CSV</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="id-table">
+            <thead><tr>
+              <th>#</th><th>Date &amp; Time</th><th>Employee Name</th><th>Employee Email</th>
+              <th>IDs Count</th><th>Assigned By</th><th>Credentials</th>
+            </tr></thead>
+            <tbody id="rpt-alloc-tbody"></tbody>
+          </table>
+        </div>
+        <div id="rpt-alloc-empty" class="empty-state" style="display:none">No allocations for this period.</div>
+      </div>
+
+      <!-- Deleted IDs history -->
+      <div class="card">
+        <div class="card-head">
+          <h3>🗑 Deleted ID History</h3>
+          <button class="btn btn-secondary btn-sm" id="rpt-export-deleted">⬇ Export CSV</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="id-table">
+            <thead><tr>
+              <th>#</th><th>Edunet Mail ID</th><th>Password</th><th>Assigned To</th>
+              <th>Assigned By</th><th>Allocation Date</th><th>Deleted By</th><th>Deleted Date</th>
+            </tr></thead>
+            <tbody id="rpt-deleted-tbody"></tbody>
+          </table>
+        </div>
+        <div id="rpt-deleted-empty" class="empty-state" style="display:none">No deleted IDs for this period.</div>
+      </div>
+
+    </div>
+
+  </div><!-- /tab-content -->
+
+  <footer>Made with IBM Bob &nbsp;·&nbsp; Powered by IBM watsonx Granite</footer>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+let pool = [], history = [], employees = [];
+let idPage = 1;
+const PAGE = 50;
+let selectedEmp = null;   // { name, email }
+
+// ══════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════
+let loggedInUser = "Admin";
+
+// ── Restore session on page load (survives browser refresh) ──
+(function restoreSession() {
+  const saved = localStorage.getItem("edunet_session");
+  if (saved) {
+    try {
+      const { user } = JSON.parse(saved);
+      if (user) { loggedInUser = user; enterApp(user); }
+    } catch(e) { localStorage.removeItem("edunet_session"); }
+  }
+})();
+
+// ── Username/password login ───────────────────────────
+async function login() {
+  const u = document.getElementById("l-user").value.trim();
+  const p = document.getElementById("l-pass").value.trim();
+  if (!u || !p) { document.getElementById("l-err").textContent = "Enter username and password."; return; }
+  try {
+    const res  = await fetch("/api/login", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({username:u, password:p}) });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      loggedInUser = data.displayName;
+      localStorage.setItem("edunet_session", JSON.stringify({ user: data.displayName }));
+      enterApp(data.displayName);
+    } else {
+      document.getElementById("l-err").textContent = data.error || "Invalid credentials.";
+    }
+  } catch(e) {
+    document.getElementById("l-err").textContent = "Server error. Try again.";
+  }
+}
+
+// ── Google Sign-In callback ───────────────────────────
+function handleGoogleLogin(response) {
+  try {
+    // Decode JWT payload (no library needed — just base64 decode middle part)
+    const payload = JSON.parse(atob(response.credential.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+    const name    = payload.name  || payload.email || "Google User";
+    const email   = payload.email || "";
+    // Only allow your specific admin Google account — change this to your Gmail
+    const ALLOWED = "aiaswinikumar@gmail.com";
+    if (email.toLowerCase() !== ALLOWED.toLowerCase()) {
+      document.getElementById("l-err").textContent = "❌ This Google account is not authorised.";
+      return;
+    }
+    loggedInUser = name;   // e.g. "Aiaswini Kumar" — shows in reports as Assigned By
+    localStorage.setItem("edunet_session", JSON.stringify({ user: name }));
+    enterApp(name);
+  } catch(e) {
+    document.getElementById("l-err").textContent = "Google login failed. Try username/password.";
+  }
+}
+
+// ── Common app entry ──────────────────────────────────
+function enterApp(displayName) {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  document.getElementById("tb-user").textContent = "👤 " + displayName;
+  loadAll();
+}
+
+// ── Logout — clears session then reloads ─────────────
+function logout() {
+  localStorage.removeItem("edunet_session");
+  location.reload();
+}
+
+// ══════════════════════════════════════════════════
+// LOAD DATA
+// ══════════════════════════════════════════════════
+async function loadAll() {
+  try {
+    const [sRes, iRes, hRes, eRes] = await Promise.all([
+      fetch("/api/stats"), fetch("/api/ids"),
+      fetch("/api/history"), fetch("/api/employees")
+    ]);
+    const stats = await sRes.json();
+    pool      = (await iRes.json()).pool;
+    history   = await hRes.json();
+    employees = await eRes.json();
+    updateStats(stats);
+    renderEmployeeChips();
+    renderEmployees();
+    renderIds();
+  } catch(e) { toast("Load error: " + e.message, "err"); }
+}
+
+function updateStats(s) {
+  if (!s) {
+    const used = pool.filter(x => x.used).length;
+    s = { total: pool.length, used, available: pool.length - used, allocations: history.length };
+  }
+  document.getElementById("s-total").textContent = s.total;
+  document.getElementById("s-avail").textContent = s.available;
+  document.getElementById("s-used").textContent  = s.used;
+  document.getElementById("s-alloc").textContent = s.allocations;
+  document.getElementById("tb-avail").textContent = s.available + " avail";
+  document.getElementById("tb-used").textContent  = s.used + " used";
+  document.getElementById("emp-count-badge").textContent = employees.length;
+  document.getElementById("id-count-badge").textContent  = s.total;
+}
+
+// ══════════════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════════════
+function switchTab(name) {
+  ["agent","employees","ids","reports"].forEach(n => {
+    document.getElementById("t-"+n).classList.toggle("active", n===name);
+    document.getElementById("tab-"+n).classList.toggle("active", n===name);
+  });
+  if (name === "reports") loadReport();
+}
+
+// ══════════════════════════════════════════════════
+// EMPLOYEE CHIPS (sidebar)
+// ══════════════════════════════════════════════════
+function renderEmployeeChips() {
+  const el = document.getElementById("emp-chips");
+  if (!employees.length) {
+    el.innerHTML = '<div style="font-size:12px;color:#9ca3af">No employees yet. Add in the Employees tab.</div>';
+    return;
+  }
+  el.innerHTML = employees.map(e => `
+    <div class="emp-chip ${selectedEmp && selectedEmp.email===e.email?'selected':''}"
+         onclick="selectEmp(${e.id},'${esc(e.name)}','${esc(e.email)}')">
+      <div>
+        <div class="ec-name">${esc(e.name)}</div>
+        <div class="ec-email">${esc(e.email)}</div>
+      </div>
+      <span class="ec-sel">✓</span>
+    </div>`).join("");
+}
+
+function selectEmp(id, name, email) {
+  selectedEmp = { id, name, email };
+  document.getElementById("sel-emp-label").textContent = name + " (" + email + ")";
+  document.getElementById("selected-emp-bar").style.display = "block";
+  renderEmployeeChips();
+  document.getElementById("chat-inp").focus();
+}
+
+function clearSelectedEmp() {
+  selectedEmp = null;
+  document.getElementById("selected-emp-bar").style.display = "none";
+  renderEmployeeChips();
+}
+
+// ══════════════════════════════════════════════════
+// CHAT / AI AGENT
+// ══════════════════════════════════════════════════
+function handleChatKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+}
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 100) + "px";
+}
+function fillChat(txt) {
+  const inp = document.getElementById("chat-inp");
+  inp.value = txt;
+  inp.focus();
+}
+
+async function sendChat() {
+  const inp = document.getElementById("chat-inp");
+  const raw = inp.value.trim();
+  if (!raw) return;
+  inp.value = ""; inp.style.height = "auto";
+
+  addMsg("user", raw);
+  const typingId = addTyping();
+  document.getElementById("chat-send-btn").disabled = true;
+
+  try {
+    const result = await processCommand(raw);
+    removeTyping(typingId);
+    handleResult(result);
+  } catch(e) {
+    removeTyping(typingId);
+    addMsg("agent", "❌ Error: " + e.message);
+  }
+  document.getElementById("chat-send-btn").disabled = false;
+  scrollChat();
+}
+
+// ── Parse intent locally (fast, no AI needed for simple commands) ─────
+function parseLocally(text) {
+  const t = text.toLowerCase().trim();
+
+  // Status queries
+  if (/how many|available|status|count|remaining/i.test(t)) {
+    return { action: "status" };
+  }
+  if (/history|allocat/i.test(t) && /show|list|display/i.test(t)) {
+    return { action: "history" };
+  }
+
+  // Allocation patterns:
+  // "assign 10 ids to Priya via priya@co.com"
+  // "give 5 ids with employee1"
+  // "share 20 ids to ravi"
+  // "send 3 ids for john"
+  const numMatch = t.match(/(\d+)\s*(?:id|credential|login|account)s?/i);
+  if (!numMatch) return null;
+  const count = parseInt(numMatch[1]);
+
+  // Try to get email
+  const emailMatch = text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+  const email = emailMatch ? emailMatch[0].toLowerCase() : null;
+
+  // Try to get name — look after "to/with/for" keywords, before "via/through"
+  let name = null;
+  const nameMatch = text.match(/(?:to|with|for|of)\s+([A-Za-z0-9 _]+?)(?:\s+via|\s+through|\s+at|\s+using|$)/i);
+  if (nameMatch) name = nameMatch[1].trim();
+
+  return { action: "allocate", count, name, email };
+}
+
+// ── Main command processor ────────────────────────
+async function processCommand(text) {
+  const avail = pool.filter(x => !x.used).length;
+
+  // 1. Fast local parse first
+  const local = parseLocally(text);
+
+  // 2. If local parse got a clear allocate intent, try to fill in missing info from employee directory / selectedEmp
+  if (local && local.action === "allocate") {
+    let { count, name, email } = local;
+
+    // Prefer selected employee from sidebar
+    if (selectedEmp) {
+      if (!name)  name  = selectedEmp.name;
+      if (!email) email = selectedEmp.email;
+      // If text has a name, check if it fuzzy-matches selectedEmp, otherwise use text name
+    }
+
+    // If still no email but have a name, look up in directory
+    if (!email && name) {
+      const found = findEmployeeByName(name);
+      if (found) { email = found.email; name = found.name; }
+    }
+
+    // If we have everything, allocate immediately
+    if (name && email && count) {
+      return { action: "allocate", count, name, email };
+    }
+
+    // If missing email, ask
+    if (name && !email) {
+      return { action: "ask_email", name, count };
+    }
+
+    // If missing name but have email
+    if (!name && email) {
+      return { action: "allocate", count, name: email.split("@")[0], email };
+    }
+
+    return { action: "ask_name", count };
+  }
+
+  if (local && local.action === "status") return { action: "status" };
+  if (local && local.action === "history") return { action: "history" };
+
+  // 3. Fall back to Granite AI for complex / ambiguous commands
+  return await callGranite(text);
+}
+
+function findEmployeeByName(name) {
+  const n = name.toLowerCase().trim();
+  // Exact match first
+  let found = employees.find(e => e.name.toLowerCase() === n);
+  if (found) return found;
+  // Partial match
+  found = employees.find(e => e.name.toLowerCase().includes(n) || n.includes(e.name.toLowerCase()));
+  return found || null;
+}
+
+// ── Granite AI call ───────────────────────────────
+async function callGranite(text) {
+  const avail = pool.filter(x => !x.used).length;
+  const empList = employees.map(e => `${e.name} <${e.email}>`).join(", ") || "none";
+  const prompt =
+`<|system|>
+You are an Edunet ID allocation assistant. Current pool: ${pool.length} total, ${avail} available.
+Employee directory: ${empList}.
+
+Parse the user command and return ONLY a valid JSON object (no markdown, no extra text):
+- Allocate: {"action":"allocate","count":N,"name":"Full Name","email":"email@example.com"}
+- Status query: {"action":"status"}
+- History: {"action":"history"}
+- Need more info: {"action":"ask_email","name":"Name","count":N} or {"action":"ask_name","count":N}
+<|user|>
+${text}
+<|assistant|>
+{`;
+
+  const res  = await fetch("/api/ai", {
+    method : "POST",
+    headers: { "Content-Type": "application/json" },
+    body   : JSON.stringify({ prompt })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+
+  const raw = "{" + (data.text || "");
+  try {
+    const json = JSON.parse((raw.match(/\{[\s\S]*?\}/)||["{}"])[0]);
+    return json;
+  } catch(e) {
+    // Granite response wasn't clean JSON — do one more local parse attempt
+    return parseLocally(text) || { action: "unknown", raw: data.text };
+  }
+}
+
+// ── Handle result from processCommand ─────────────
+async function handleResult(result) {
+  const { action } = result;
+
+  if (action === "status") {
+    const avail = pool.filter(x => !x.used).length;
+    const used  = pool.filter(x => x.used).length;
+    addMsg("agent",
+      `📊 **Pool Status**\n\n` +
+      `• Total IDs: ${pool.length}\n` +
+      `• ✅ Available: ${avail}\n` +
+      `• 🔴 Used/Assigned: ${used}\n` +
+      `• 📋 Total allocations made: ${history.length}\n` +
+      `• 👥 Employees registered: ${employees.length}`
+    );
+    return;
+  }
+
+  if (action === "history") {
+    if (!history.length) { addMsg("agent", "No allocations have been made yet."); return; }
+    const lines = history.slice(0,10).map((h,i) =>
+      `${i+1}. **${h.employee}** — ${h.count} IDs — ${h.date}`).join("\n");
+    addMsg("agent", `📋 **Recent Allocations** (last ${Math.min(10,history.length)}):\n\n${lines}`);
+    return;
+  }
+
+  if (action === "ask_email") {
+    addMsg("agent",
+      `I found the name **${result.name}** but couldn't find their email in the directory.\n\n` +
+      `Please reply with their email address, or add them in the **Employees tab** first.`
+    );
+    // Pre-fill name for next message
+    document.getElementById("chat-inp").value = `Assign ${result.count} ids to ${result.name} via `;
+    document.getElementById("chat-inp").focus();
+    return;
+  }
+
+  if (action === "ask_name") {
+    addMsg("agent",
+      `I need to know who to assign the ${result.count} IDs to.\n\n` +
+      `Please select an employee from the left panel or type their name/email.`
+    );
+    return;
+  }
+
+  if (action === "allocate") {
+    let { count, name, email } = result;
+
+    // Validate
+    const avail = pool.filter(x => !x.used).length;
+    if (avail < count) {
+      addMsg("agent", `❌ Not enough IDs! Only **${avail}** available, you requested **${count}**.`);
+      return;
+    }
+
+    // If employee not in directory yet, show confirmation and add them
+    if (!employees.find(e => e.email.toLowerCase() === email.toLowerCase())) {
+      addMsg("agent",
+        `ℹ️ **${name}** (${email}) is not in the directory yet. Adding them automatically...`
+      );
+      await fetch("/api/employees", {
+        method : "POST",
+        headers: { "Content-Type": "application/json" },
+        body   : JSON.stringify({ name, email })
+      });
+      employees = await (await fetch("/api/employees")).json();
+      renderEmployees();
+      renderEmployeeChips();
+    }
+
+    // Allocate
+    addMsg("agent", `⏳ Allocating **${count}** IDs to **${name}**...`);
+    const res  = await fetch("/api/allocate", {
+      method : "POST",
+      headers: { "Content-Type": "application/json" },
+      body   : JSON.stringify({ employeeName: name, employeeEmail: email, count, assignedBy: loggedInUser })
+    });
+    const data = await res.json();
+    if (!res.ok) { addMsg("agent", "❌ " + data.error); return; }
+
+    // Success message with action card
+    pool      = (await (await fetch("/api/ids")).json()).pool;
+    history   = await (await fetch("/api/history")).json();
+    employees = await (await fetch("/api/employees")).json();
+    updateStats(null);
+    renderIds();
+    renderEmployees();
+    renderEmployeeChips();
+    clearSelectedEmp();
+
+    addAllocationCard(name, email, count, data.allocated);
+    return;
+  }
+
+  if (action === "unknown") {
+    addMsg("agent",
+      `🤔 I didn't quite understand that. Try:\n\n` +
+      `• "Assign 10 ids to Priya"\n` +
+      `• "Give 5 ids to ravi@company.com"\n` +
+      `• "How many IDs are available?"`
+    );
+  }
+}
+
+// ── Chat bubble helpers ───────────────────────────
+function addMsg(role, text) {
+  const box  = document.getElementById("chat-messages");
+  const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const div  = document.createElement("div");
+  div.className = "msg " + role;
+  const avatar = role === "agent" ? "🤖" : "👤";
+  // Bold markdown shortcut
+  const html = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br>");
+  div.innerHTML = `
+    <div class="msg-avatar">${avatar}</div>
+    <div>
+      <div class="msg-bubble">${html}</div>
+      <div class="msg-time">${time}</div>
+    </div>`;
+  box.appendChild(div);
+  scrollChat();
+  return div;
+}
+
+function addAllocationCard(name, email, count, ids) {
+  const box  = document.getElementById("chat-messages");
+  const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const idRows = ids.map((id, i) =>
+    `<div class="allocated-id-row">${i+1}. ${id.email}  |  ${id.password}</div>`
+  ).join("");
+
+  const cardId = "card-" + Date.now();
+
+  const div = document.createElement("div");
+  div.className = "msg agent";
+  div.innerHTML = `
+    <div class="msg-avatar">🤖</div>
+    <div style="max-width:520px">
+      <div class="msg-bubble">
+        ✅ Done! <strong>${count} IDs</strong> have been allocated to <strong>${name}</strong> and marked as <span style="color:#dc2626;font-weight:700">used (red)</span>.
+      </div>
+      <div class="msg-action-card">
+        <div class="card-label">📋 Allocated Credentials</div>
+        <div class="allocated-ids">${idRows}</div>
+        <div class="card-actions">
+          <button class="btn btn-green btn-sm" id="send-btn-${cardId}">✉️ Send Email to ${esc(email)}</button>
+          <button class="btn btn-secondary btn-sm" onclick="copyIds(this)" data-ids="${esc(ids.map((id,i)=>`${i+1}. Mail: ${id.email} | Password: ${id.password}`).join('\n'))}">📋 Copy Credentials</button>
+        </div>
+        <div id="send-status-${cardId}" style="margin-top:8px;font-size:12px"></div>
+      </div>
+      <div class="msg-time">${time}</div>
+    </div>`;
+  box.appendChild(div);
+  scrollChat();
+
+  // Wire up the Send Email button
+  document.getElementById("send-btn-" + cardId).addEventListener("click", async function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = "⏳ Sending…";
+    const statusEl = document.getElementById("send-status-" + cardId);
+    try {
+      const res  = await fetch("/api/send-email", {
+        method : "POST",
+        headers: { "Content-Type": "application/json" },
+        body   : JSON.stringify({ toName: name, toEmail: email, ids })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      btn.textContent = "✅ Email Sent!";
+      btn.className   = "btn btn-secondary btn-sm";
+      statusEl.innerHTML = `<span style="color:#16a34a;font-weight:600">✅ Email delivered to <strong>${esc(email)}</strong></span>`;
+      toast("Email sent to " + email, "ok");
+    } catch(e) {
+      btn.disabled    = false;
+      btn.textContent = "✉️ Retry Send Email";
+      statusEl.innerHTML = `<span style="color:#dc2626;font-weight:600">❌ Failed: ${esc(e.message)}</span>`;
+      toast("Email failed: " + e.message, "err");
+    }
+  });
+}
+
+function addTyping() {
+  const box = document.getElementById("chat-messages");
+  const div = document.createElement("div");
+  div.className = "msg agent";
+  div.id = "typing-" + Date.now();
+  div.innerHTML = `
+    <div class="msg-avatar">🤖</div>
+    <div>
+      <div class="msg-bubble"><span class="typing-dots"><span></span><span></span><span></span></span></div>
+    </div>`;
+  box.appendChild(div);
+  scrollChat();
+  return div.id;
+}
+
+function removeTyping(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function scrollChat() {
+  const box = document.getElementById("chat-messages");
+  box.scrollTop = box.scrollHeight;
+}
+
+function copyIds(btn) {
+  navigator.clipboard.writeText(btn.dataset.ids)
+    .then(() => toast("Credentials copied!", "ok"));
+}
+
+// ══════════════════════════════════════════════════
+// EMPLOYEES TAB
+// ══════════════════════════════════════════════════
+async function addEmployee() {
+  const name  = document.getElementById("emp-name").value.trim();
+  const email = document.getElementById("emp-email").value.trim();
+  if (!name)  return toast("Enter employee name", "err");
+  if (!email) return toast("Enter employee email", "err");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast("Invalid email address", "err");
+
+  const btn = document.getElementById("add-emp-btn");
+  btn.disabled = true;
+  const res  = await fetch("/api/employees", {
+    method : "POST",
+    headers: { "Content-Type": "application/json" },
+    body   : JSON.stringify({ name, email })
+  });
+  const data = await res.json();
+  btn.disabled = false;
+  if (!res.ok) return toast(data.error, "err");
+
+  employees.push(data.employee);
+  document.getElementById("emp-name").value  = "";
+  document.getElementById("emp-email").value = "";
+  updateStats(null);
+  renderEmployees();
+  renderEmployeeChips();
+  toast("Employee added: " + name, "ok");
+}
+
+async function deleteEmployee(id) {
+  if (!confirm("Remove this employee?")) return;
+  await fetch("/api/employees/" + id, { method: "DELETE" });
+  employees = employees.filter(e => e.id !== id);
+  if (selectedEmp && selectedEmp.id === id) clearSelectedEmp();
+  updateStats(null);
+  renderEmployees();
+  renderEmployeeChips();
+  toast("Employee removed", "info");
+}
+
+function renderEmployees() {
+  const q     = (document.getElementById("emp-search").value || "").toLowerCase();
+  const list  = employees.filter(e =>
+    e.name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)
+  );
+  const tbody = document.getElementById("emp-tbody");
+  const empty = document.getElementById("emp-empty");
+
+  if (!list.length) {
+    tbody.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  tbody.innerHTML = list.map((e, i) => {
+    const allocs = history.filter(h => h.email.toLowerCase() === e.email.toLowerCase());
+    const total  = allocs.reduce((s, h) => s + h.count, 0);
+    const last   = allocs.length ? allocs[0].date : "—";
+    const initials = e.name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
+    return `<tr>
+      <td style="color:#9ca3af;font-size:12px">${i+1}</td>
+      <td>
+        <span class="emp-avatar">${initials}</span>
+        <span id="name-display-${e.id}">${esc(e.name)}</span>
+        <span class="inline-edit" id="name-edit-${e.id}">
+          <input value="${esc(e.name)}" id="ne-name-${e.id}" style="width:130px"/>
+          <input value="${esc(e.email)}" id="ne-email-${e.id}" style="width:170px"/>
+          <button class="btn btn-green btn-xs" onclick="saveEmployee(${e.id})">Save</button>
+          <button class="btn btn-secondary btn-xs" onclick="cancelEdit(${e.id})">✕</button>
+        </span>
+      </td>
+      <td style="color:#57606a" id="email-display-${e.id}">${esc(e.email)}</td>
+      <td><span style="font-weight:700;color:#3b82d4">${total}</span> IDs</td>
+      <td style="font-size:12px;color:#9ca3af;white-space:nowrap">${last}</td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-secondary btn-xs" onclick="editEmployee(${e.id})">✏️ Edit</button>
+          <button class="btn btn-red btn-xs" onclick="deleteEmployee(${e.id})">🗑 Remove</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+function editEmployee(id) {
+  document.getElementById("name-display-" + id).style.display = "none";
+  document.getElementById("email-display-" + id).style.display = "none";
+  document.getElementById("name-edit-" + id).classList.add("show");
+}
+function cancelEdit(id) {
+  document.getElementById("name-display-" + id).style.display = "";
+  document.getElementById("email-display-" + id).style.display = "";
+  document.getElementById("name-edit-" + id).classList.remove("show");
+}
+async function saveEmployee(id) {
+  const name  = document.getElementById("ne-name-"  + id).value.trim();
+  const email = document.getElementById("ne-email-" + id).value.trim();
+  const res   = await fetch("/api/employees/" + id, {
+    method : "PUT",
+    headers: { "Content-Type": "application/json" },
+    body   : JSON.stringify({ name, email })
+  });
+  const data  = await res.json();
+  if (!res.ok) return toast(data.error, "err");
+  const idx = employees.findIndex(e => e.id === id);
+  if (idx >= 0) employees[idx] = data.employee;
+  renderEmployees();
+  renderEmployeeChips();
+  cancelEdit(id);
+  toast("Employee updated", "ok");
+}
+
+// ══════════════════════════════════════════════════
+// ID POOL TAB
+// ══════════════════════════════════════════════════
+function isBroken(r) {
+  return !r.email || r.email.toString().trim() === "" ||
+         !r.password || r.password.toString().trim() === "";
+}
+
+function renderIds() {
+  const q        = (document.getElementById("id-search").value || "").toLowerCase();
+  const onlyUsed = document.getElementById("chk-used").checked;
+  let rows = pool.filter(r => !isBroken(r));   // hide broken rows from main table
+  if (onlyUsed) rows = rows.filter(x => x.used);
+  if (q) rows = rows.filter(x =>
+    (x.email||"").toLowerCase().includes(q) ||
+    (x.assignedTo||"").toLowerCase().includes(q) ||
+    (x.assignedEmail||"").toLowerCase().includes(q)
+  );
+
+  const total = rows.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE));
+  if (idPage > pages) idPage = pages;
+  const slice = rows.slice((idPage-1)*PAGE, idPage*PAGE);
+
+  document.getElementById("id-tbl-info").textContent =
+    `Showing ${Math.min((idPage-1)*PAGE+1, total)}–${Math.min(idPage*PAGE, total)} of ${total}`;
+
+  document.getElementById("id-tbody").innerHTML = slice.map(r => `
+    <tr class="${r.used ? "row-used" : "row-avail"}" data-email="${esc(r.email)}">
+      <td><input type="checkbox" class="pool-chk" data-email="${esc(r.email)}"/></td>
+      <td style="color:#9ca3af;font-size:11px">${r.sno}</td>
+      <td class="email-col" style="font-family:monospace;font-size:12px">${esc(r.email)}</td>
+      <td class="pass-col"  style="font-family:monospace;font-size:12px">${esc(r.password)}</td>
+      <td><span class="badge ${r.used?"badge-used":"badge-avail"}">${r.used?"● Used":"● Available"}</span></td>
+      <td style="font-weight:${r.used?'600':'400'}">${esc(r.assignedTo)||"—"}</td>
+      <td style="font-size:12px;color:#57606a">${esc(r.assignedEmail)||"—"}</td>
+      <td style="font-size:11px;color:#9ca3af;white-space:nowrap">${r.date||"—"}</td>
+      <td><button class="btn btn-red btn-xs pool-del-btn" data-email="${esc(r.email)}">🗑</button></td>
+    </tr>`).join("");
+
+  // Single delete per row
+  document.getElementById("id-tbody").querySelectorAll(".pool-del-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const row    = btn.closest("tr");
+      const isUsed = row && row.classList.contains("row-used");
+      const msg    = isUsed
+        ? `⚠️ This ID is currently ASSIGNED to an employee.\n\nDeleting it will permanently remove it from the pool.\n\nProceed?`
+        : `Delete this ID?\n${btn.dataset.email}`;
+      if (!confirm(msg)) return;
+      await deleteIdsByEmails([btn.dataset.email]);
+    });
+  });
+
+  // Per-row checkbox → show/hide bulk delete bar
+  document.getElementById("id-tbody").querySelectorAll(".pool-chk").forEach(chk => {
+    chk.addEventListener("change", updatePoolBulkBar);
+  });
+
+  // Select-all checkbox
+  document.getElementById("pool-select-all").addEventListener("change", function() {
+    document.querySelectorAll(".pool-chk").forEach(c => c.checked = this.checked);
+    updatePoolBulkBar();
+  });
+
+  // Pagination
+  const pgEl = document.getElementById("id-pagination");
+  if (pages <= 1) { pgEl.innerHTML = ""; }
+  else {
+    let html = "";
+    for (let i = 1; i <= pages; i++) {
+      if (i===1 || i===pages || Math.abs(i-idPage)<=2)
+        html += `<button class="pg-btn${i===idPage?" active":""}" onclick="goPage(${i})">${i}</button>`;
+      else if (Math.abs(i-idPage)===3)
+        html += `<span style="color:#9ca3af">…</span>`;
+    }
+    html += `<span class="pg-info">Page ${idPage} of ${pages}</span>`;
+    pgEl.innerHTML = html;
+  }
+
+  // Show/hide broken IDs alert button
+  const badCount = pool.filter(isBroken).length;
+  const showBadBtn = document.getElementById("show-bad-btn");
+  if (badCount > 0) {
+    showBadBtn.style.display = "inline-flex";
+    showBadBtn.textContent   = `⚠️ ${badCount} Broken IDs`;
+  } else {
+    showBadBtn.style.display = "none";
+    document.getElementById("bad-ids-card").style.display = "none";
+  }
+}
+
+function updatePoolBulkBar() {
+  const checked = document.querySelectorAll(".pool-chk:checked");
+  const btn     = document.getElementById("delete-selected-pool-btn");
+  const lbl     = document.getElementById("pool-selected-count");
+  if (checked.length > 0) {
+    btn.style.display = "inline-flex";
+    lbl.textContent   = `${checked.length} selected`;
+  } else {
+    btn.style.display = "none";
+    lbl.textContent   = "";
+  }
+}
+
+function goPage(n) { idPage = n; renderIds(); }
+
+// ── Core delete helper ────────────────────────────────
+async function deleteIdsByEmails(emails) {
+  const res  = await fetch("/api/delete-ids", {
+    method : "POST",
+    headers: { "Content-Type": "application/json" },
+    body   : JSON.stringify({ emails })
+  });
+  const data = await res.json();
+  if (!res.ok) return toast("Delete failed: " + data.error, "err");
+  pool    = (await (await fetch("/api/ids")).json()).pool;
+  history = await (await fetch("/api/history")).json();
+  updateStats(null);
+  renderIds();
+  renderBadIds();
+  toast(`🗑 Removed ${data.removed} ID(s). Total: ${data.total}`, "ok");
+}
+
+// ── Bulk delete selected in main pool table ───────────
+document.getElementById("delete-selected-pool-btn").addEventListener("click", async () => {
+  const checked  = [...document.querySelectorAll(".pool-chk:checked")];
+  if (!checked.length) return;
+  const emails   = checked.map(c => c.dataset.email);
+  const usedRows = checked.filter(c => c.closest("tr") && c.closest("tr").classList.contains("row-used"));
+  const msg      = usedRows.length
+    ? `You have selected ${usedRows.length} ASSIGNED ID(s) among ${emails.length} total.\n\nAll selected IDs will be permanently deleted.\n\nProceed?`
+    : `Delete ${emails.length} selected ID(s)? This cannot be undone.`;
+  if (!confirm(msg)) return;
+  await deleteIdsByEmails(emails);
+  document.getElementById("pool-select-all").checked = false;
+});
+
+// ── Broken IDs panel ──────────────────────────────────
+function renderBadIds() {
+  const bad = pool.filter(isBroken);
+  const card = document.getElementById("bad-ids-card");
+  if (!bad.length) { card.style.display = "none"; return; }
+
+  document.getElementById("bad-ids-count").textContent = `(${bad.length} found)`;
+  document.getElementById("bad-ids-tbody").innerHTML = bad.map((r, i) => `
+    <tr>
+      <td><input type="checkbox" class="bad-chk" data-idx="${i}" data-email="${esc(r.email||'')}"/></td>
+      <td style="color:#9ca3af">${r.sno}</td>
+      <td style="font-family:monospace;color:${r.email?'#1f2328':'#dc2626'}">${r.email || '<em style="color:#dc2626">BLANK</em>'}</td>
+      <td style="font-family:monospace;color:${r.password?'#1f2328':'#dc2626'}">${r.password || '<em style="color:#dc2626">BLANK</em>'}</td>
+      <td><button class="btn btn-red btn-xs bad-del-one" data-email="${esc(r.email||'')}">🗑 Delete</button></td>
+    </tr>`).join("");
+
+  // Single delete
+  document.getElementById("bad-ids-tbody").querySelectorAll(".bad-del-one").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const em = btn.dataset.email;
+      const label = em || `row #${btn.closest("tr").querySelector("td:nth-child(2)").textContent}`;
+      if (!confirm(`Delete broken ID: ${label}?`)) return;
+      // For blank-email rows use index-based removal via remove-blank endpoint
+      if (!em) {
+        await fetch("/api/remove-blank-passwords", { method: "POST" });
+        pool = (await (await fetch("/api/ids")).json()).pool;
+        updateStats(null); renderIds(); renderBadIds();
+        toast("Broken ID removed", "ok");
+      } else {
+        await deleteIdsByEmails([em]);
+      }
+    });
+  });
+
+  // Checkbox select
+  document.querySelectorAll(".bad-chk").forEach(chk => {
+    chk.addEventListener("change", updateBadSelectedCount);
+  });
+
+  document.getElementById("bad-select-all").addEventListener("change", function() {
+    document.querySelectorAll(".bad-chk").forEach(c => c.checked = this.checked);
+    updateBadSelectedCount();
+  });
+}
+
+function updateBadSelectedCount() {
+  const n = document.querySelectorAll(".bad-chk:checked").length;
+  document.getElementById("bad-selected-count").textContent = n ? `${n} selected` : "";
+}
+
+document.getElementById("show-bad-btn").addEventListener("click", () => {
+  renderBadIds();
+  document.getElementById("bad-ids-card").style.display = "block";
+  document.getElementById("bad-ids-card").scrollIntoView({ behavior: "smooth" });
+});
+document.getElementById("hide-bad-btn").addEventListener("click", () => {
+  document.getElementById("bad-ids-card").style.display = "none";
+});
+
+document.getElementById("delete-all-bad-btn").addEventListener("click", async () => {
+  const bad = pool.filter(isBroken);
+  if (!bad.length) return toast("No broken IDs found.", "info");
+  if (!confirm(`Delete ALL ${bad.length} broken IDs? This cannot be undone.`)) return;
+  await fetch("/api/remove-blank-passwords", { method: "POST" });
+  pool = (await (await fetch("/api/ids")).json()).pool;
+  updateStats(null); renderIds(); renderBadIds();
+  toast(`🗑 All broken IDs deleted.`, "ok");
+});
+
+document.getElementById("delete-selected-bad-btn").addEventListener("click", async () => {
+  const checked = [...document.querySelectorAll(".bad-chk:checked")];
+  if (!checked.length) return toast("Select at least one row.", "info");
+  const withEmail    = checked.filter(c => c.dataset.email).map(c => c.dataset.email);
+  const blankEmailCt = checked.filter(c => !c.dataset.email).length;
+  if (!confirm(`Delete ${checked.length} selected broken ID(s)?`)) return;
+  if (withEmail.length) await deleteIdsByEmails(withEmail);
+  if (blankEmailCt)     {
+    await fetch("/api/remove-blank-passwords", { method: "POST" });
+    pool = (await (await fetch("/api/ids")).json()).pool;
+    updateStats(null); renderIds(); renderBadIds();
+  }
+});
+
+// ══════════════════════════════════════════════════
+// UTILITIES
+// ══════════════════════════════════════════════════
+// Remove IDs with blank passwords
+document.getElementById("remove-blank-btn").addEventListener("click", async function() {
+  const blankCount = pool.filter(r => !r.password || r.password.toString().trim() === "").length;
+  if (blankCount === 0) return toast("No blank-password IDs found.", "info");
+  if (!confirm(`Remove ${blankCount} IDs that have no password? This cannot be undone.`)) return;
+  this.disabled = true;
+  this.textContent = "⏳ Removing…";
+  const res  = await fetch("/api/remove-blank-passwords", { method: "POST" });
+  const data = await res.json();
+  pool    = (await (await fetch("/api/ids")).json()).pool;
+  history = await (await fetch("/api/history")).json();
+  updateStats(null);
+  renderIds();
+  toast(`🧹 Removed ${data.removed} blank-password IDs. Total: ${data.total}`, "ok");
+  this.disabled = false;
+  this.textContent = "🧹 Remove Blank Passwords";
+});
+
+async function resetAll() {
+  if (!confirm("Reset ALL ID assignments? This cannot be undone.")) return;
+  await fetch("/api/reset", { method: "POST" });
+  pool    = (await (await fetch("/api/ids")).json()).pool;
+  history = await (await fetch("/api/history")).json();
+  updateStats(null);
+  renderIds();
+  toast("All IDs reset to available", "ok");
+}
+
+// ══════════════════════════════════════════════════
+// ADD MORE IDs
+// ══════════════════════════════════════════════════
+
+// Toggle expand/collapse
+document.getElementById("toggle-add-ids-btn").addEventListener("click", function() {
+  const panel = document.getElementById("add-ids-panel");
+  const open  = panel.style.display === "none";
+  panel.style.display  = open ? "block" : "none";
+  this.textContent     = open ? "▲ Collapse" : "▼ Expand";
+});
+
+// ── Helper: call /api/add-ids and refresh ────────
+async function submitNewIds(ids, statusElId, btnEl) {
+  if (!ids.length) {
+    document.getElementById(statusElId).innerHTML =
+      `<span style="color:#dc2626">❌ No valid rows found.</span>`;
+    return;
+  }
+  btnEl.disabled = true;
+  btnEl.textContent = "⏳ Adding…";
+  try {
+    const res  = await fetch("/api/add-ids", {
+      method : "POST",
+      headers: { "Content-Type": "application/json" },
+      body   : JSON.stringify({ ids })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    // Refresh pool display
+    pool    = (await (await fetch("/api/ids")).json()).pool;
+    history = await (await fetch("/api/history")).json();
+    updateStats(null);
+    renderIds();
+
+    document.getElementById(statusElId).innerHTML =
+      `<span style="color:#16a34a;font-weight:600">✅ Added <strong>${data.added}</strong> new IDs. ` +
+      `${data.skipped ? `<span style="color:#9ca3af">(${data.skipped} duplicates skipped)</span>` : ""} ` +
+      `Total pool: <strong>${data.total}</strong></span>`;
+    toast(`${data.added} new IDs added! Total: ${data.total}`, "ok");
+  } catch(e) {
+    document.getElementById(statusElId).innerHTML =
+      `<span style="color:#dc2626">❌ ${e.message}</span>`;
+    toast("Failed: " + e.message, "err");
+  }
+  btnEl.disabled = false;
+  btnEl.textContent = btnEl.id === "upload-xlsx-btn" ? "⬆ Upload & Add IDs" : "➕ Add These IDs";
+}
+
+// ── Manual entry ─────────────────────────────────
+document.getElementById("add-manual-btn").addEventListener("click", function() {
+  const raw  = document.getElementById("manual-ids-input").value.trim();
+  if (!raw) return;
+  const ids  = raw.split("\n").map(line => {
+    const parts = line.split(/,(?![^,]*,)/);   // split on last comma or first comma
+    const [email, ...rest] = line.split(",");
+    return { email: (email||"").trim(), password: rest.join(",").trim() };
+  }).filter(r => r.email);
+  submitNewIds(ids, "manual-status", this);
+});
+
+// ── Excel file upload ─────────────────────────────
+document.getElementById("upload-xlsx-btn").addEventListener("click", function() {
+  const file = document.getElementById("xlsx-upload").files[0];
+  const statusEl = document.getElementById("upload-status");
+  if (!file) {
+    statusEl.innerHTML = `<span style="color:#dc2626">❌ Please select an Excel file first.</span>`;
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      // Use SheetJS from CDN (loaded below)
+      const data  = new Uint8Array(e.target.result);
+      const wb    = XLSX.read(data, { type: "array" });
+      const ws    = wb.Sheets[wb.SheetNames[0]];
+      // Parse with headers so we can do positional fallback too
+      const rows     = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      const rawRows  = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      // rawRows[0] = header row, rawRows[1..] = data rows
+      // Detect column positions by header name first, fallback to position
+      const headers  = (rawRows[0] || []).map(h => (h||"").toString().toLowerCase().trim());
+      const emailCol = headers.findIndex(h => /mail|email/.test(h));
+      const passCol  = headers.findIndex(h => /pass|pwd|password/.test(h));
+      // Use positional index: if headers not found assume col1=email, col2=password
+      const eIdx = emailCol >= 0 ? emailCol : 1;
+      const pIdx = passCol  >= 0 ? passCol  : 2;
+      const ids = rawRows.slice(1).map(row => ({
+        email   : (row[eIdx] || "").toString().trim(),
+        password: (row[pIdx] || "").toString().trim()
+      })).filter(r => r.email);
+      submitNewIds(ids, "upload-status", document.getElementById("upload-xlsx-btn"));
+    } catch(err) {
+      statusEl.innerHTML = `<span style="color:#dc2626">❌ Failed to parse Excel: ${err.message}</span>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+async function reloadExcel() {
+  const res  = await fetch("/api/reload", { method: "POST" });
+  const data = await res.json();
+  if (data.error) return toast("Reload failed: " + data.error, "err");
+  pool    = (await (await fetch("/api/ids")).json()).pool;
+  history = await (await fetch("/api/history")).json();
+  updateStats(null);
+  renderIds();
+  toast(`Excel reloaded — ${data.total} IDs`, "ok");
+}
+
+function exportCSV() {
+  const hdr  = ["S.NO","Email","Password","Status","Assigned To","Assigned Email","Date"];
+  const rows = pool.map(r => [r.sno, r.email, r.password,
+    r.used?"Used":"Available", r.assignedTo||"", r.assignedEmail||"", r.date||""]);
+  const csv  = [hdr, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const a    = document.createElement("a");
+  a.href     = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+  a.download = `edunet_ids_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast("CSV exported", "ok");
+}
+
+let _toastTid;
+function toast(msg, type="info") {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className   = type;
+  t.style.display = "block";
+  clearTimeout(_toastTid);
+  _toastTid = setTimeout(() => t.style.display = "none", 3500);
+}
+
+// ══════════════════════════════════════════════════
+// REPORTS TAB
+// ══════════════════════════════════════════════════
+let currentPeriod = "all";
+
+// Period buttons — attach ONCE only (guard flag prevents duplicate listeners on tab re-switch)
+if (!window._rptListenersAttached) {
+  window._rptListenersAttached = true;
+  document.querySelectorAll(".rpt-period").forEach(btn => {
+    btn.addEventListener("click", function() {
+      document.querySelectorAll(".rpt-period").forEach(b => b.classList.remove("active-period","btn-primary"));
+      this.classList.add("active-period","btn-primary");
+      currentPeriod = this.dataset.period;
+      document.getElementById("custom-range-row").style.display = currentPeriod === "custom" ? "flex" : "none";
+      if (currentPeriod !== "custom") loadReport();
+    });
+  });
+  document.getElementById("rpt-apply-custom").addEventListener("click", loadReport);
+}
+
+async function loadReport() {
+  const period = currentPeriod;
+  let url = `/api/report?period=${period}`;
+  if (period === "custom") {
+    const from = document.getElementById("rpt-from").value;
+    const to   = document.getElementById("rpt-to").value;
+    if (!from || !to) return toast("Select both From and To dates.", "err");
+    url = `/api/report?from=${from}&to=${to}`;
+  }
+  try {
+    const data = await (await fetch(url)).json();
+    renderReport(data);
+  } catch(e) { toast("Report error: " + e.message, "err"); }
+}
+
+function renderReport(data) {
+  // Period label
+  const fmt = d => new Date(d).toLocaleDateString("en-IN");
+  document.getElementById("rpt-period-label").textContent =
+    `Period: ${fmt(data.from)} → ${fmt(data.to)}`;
+
+  // Summary cards
+  document.getElementById("rpt-total-allocs").textContent    = data.totals.allocations;
+  document.getElementById("rpt-total-ids").textContent       = data.totals.idsAssigned;
+  document.getElementById("rpt-total-deleted").textContent   = data.totals.deletedIds;
+  document.getElementById("rpt-total-assigners").textContent = data.summary.length;
+
+  // By-Assigner table
+  const aBody  = document.getElementById("rpt-assigner-tbody");
+  const aEmpty = document.getElementById("rpt-assigner-empty");
+  if (!data.summary.length) {
+    aBody.innerHTML = ""; aEmpty.style.display = "block";
+  } else {
+    aEmpty.style.display = "none";
+    aBody.innerHTML = data.summary
+      .sort((a,b) => b.idsAssigned - a.idsAssigned)
+      .map((s,i) => `<tr>
+        <td style="color:#9ca3af">${i+1}</td>
+        <td><strong>${esc(s.name)}</strong></td>
+        <td>${s.allocations}</td>
+        <td><span style="font-weight:700;color:#3b82d4">${s.idsAssigned}</span> IDs</td>
+      </tr>`).join("");
+  }
+
+  // Allocation detail table
+  const allocBody  = document.getElementById("rpt-alloc-tbody");
+  const allocEmpty = document.getElementById("rpt-alloc-empty");
+  if (!data.active.length) {
+    allocBody.innerHTML = ""; allocEmpty.style.display = "block";
+  } else {
+    allocEmpty.style.display = "none";
+    allocBody.innerHTML = data.active.map((h,i) => {
+      const credList = (h.ids||[]).map((id,j) =>
+        `${j+1}. ${id.email} | ${id.password}`).join("<br>");
+      return `<tr>
+        <td style="color:#9ca3af;font-size:11px">${i+1}</td>
+        <td style="font-size:11px;white-space:nowrap;color:#57606a">${esc(h.date)}</td>
+        <td><strong>${esc(h.employee)}</strong></td>
+        <td style="font-size:12px;color:#57606a">${esc(h.email)}</td>
+        <td style="text-align:center"><span style="font-weight:700;color:#3b82d4">${h.count}</span></td>
+        <td><span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">${esc(h.assignedBy||'Admin')}</span></td>
+        <td style="font-size:11px;font-family:monospace;max-width:280px;white-space:pre-wrap;word-break:break-all">${credList}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  // Deleted history table
+  const delBody  = document.getElementById("rpt-deleted-tbody");
+  const delEmpty = document.getElementById("rpt-deleted-empty");
+  if (!data.deleted.length) {
+    delBody.innerHTML = ""; delEmpty.style.display = "block";
+  } else {
+    delEmpty.style.display = "none";
+    delBody.innerHTML = data.deleted.map((r,i) => `<tr>
+      <td style="color:#9ca3af;font-size:11px">${i+1}</td>
+      <td style="font-family:monospace;font-size:12px;color:#dc2626">${esc(r.edunetEmail)}</td>
+      <td style="font-family:monospace;font-size:12px">${esc(r.password)}</td>
+      <td>${esc(r.assignedTo)||"—"}</td>
+      <td><span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">${esc(r.assignedBy||'Admin')}</span></td>
+      <td style="font-size:11px;color:#57606a">${esc(r.allocationDate)||"—"}</td>
+      <td><span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">${esc(r.deletedBy||'Admin')}</span></td>
+      <td style="font-size:11px;color:#57606a;white-space:nowrap">${esc(r.deletedDate)}</td>
+    </tr>`).join("");
+  }
+
+  // Store for CSV export
+  document._rptData = data;
+}
+
+// ── CSS for active period button ──────────────────────
+document.head.insertAdjacentHTML("beforeend",
+  `<style>.active-period{background:#3b82d4!important;color:#fff!important;border-color:#3b82d4!important}</style>`
+);
+
+// ── Export CSV helpers ────────────────────────────────
+document.getElementById("rpt-export-alloc").addEventListener("click", () => {
+  const data = document._rptData;
+  if (!data || !data.active.length) return toast("No data to export.", "info");
+  const rows = [["#","Date","Employee Name","Employee Email","IDs Count","Assigned By","Credentials"]];
+  data.active.forEach((h,i) => {
+    const creds = (h.ids||[]).map(id=>`${id.email}|${id.password}`).join("; ");
+    rows.push([i+1, h.date, h.employee, h.email, h.count, h.assignedBy||"Admin", creds]);
+  });
+  downloadCSV(rows, `allocation_report_${currentPeriod}.csv`);
+  toast("Allocation report exported.", "ok");
+});
+
+document.getElementById("rpt-export-deleted").addEventListener("click", () => {
+  const data = document._rptData;
+  if (!data || !data.deleted.length) return toast("No deleted history to export.", "info");
+  const rows = [["#","Edunet Mail ID","Password","Assigned To","Assigned By","Allocation Date","Deleted By","Deleted Date"]];
+  data.deleted.forEach((r,i) => {
+    rows.push([i+1, r.edunetEmail, r.password, r.assignedTo, r.assignedBy||"Admin", r.allocationDate, r.deletedBy||"Admin", r.deletedDate]);
+  });
+  downloadCSV(rows, `deleted_ids_history_${currentPeriod}.csv`);
+  toast("Deleted history exported.", "ok");
+});
+
+function downloadCSV(rows, filename) {
+  const csv = rows.map(r => r.map(c => `"${String(c||"").replace(/"/g,'""')}"`).join(",")).join("\n");
+  const a   = document.createElement("a");
+  a.href    = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+  a.download= filename;
+  a.click();
+}
+
+function esc(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+</script>
+<script src="/xlsx.full.min.js"></script>
+</body>
+</html>

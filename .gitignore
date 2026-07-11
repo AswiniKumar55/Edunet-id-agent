@@ -1,0 +1,22 @@
+﻿# ── NEVER push these ──────────────────────────────────
+.env
+*.env
+.env.*
+
+# ── Node dependencies ─────────────────────────────────
+node_modules/
+
+# ── Runtime state (local data — not for git) ──────────
+state.json
+
+# ── Excel temp lock file ──────────────────────────────
+~$*.xlsx
+
+# ── OS / editor junk ──────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+*.log
+
+# ── Bob AI temp files ──────────────────────────────
+.bob/
