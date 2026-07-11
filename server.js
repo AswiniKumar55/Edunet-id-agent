@@ -412,12 +412,13 @@ app.post("/api/ai", async (req, res) => {
 // ── Send Email ────────────────────────────────────────
 const transporter = nodemailer.createTransport({
   host  : "smtp.gmail.com",
-  port  : 587,
-  secure: false,
+  port  : 465,
+  secure: true,
   auth  : {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_PASS
-  }
+  },
+  tls: { rejectUnauthorized: false }
 });
 
 app.post("/api/send-email", async (req, res) => {
