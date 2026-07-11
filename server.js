@@ -5,6 +5,7 @@ const cors       = require("cors");
 const fs         = require("fs");
 const path       = require("path");
 const nodemailer = require("nodemailer");
+const https      = require("https");
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -409,31 +410,26 @@ app.post("/api/ai", async (req, res) => {
   }
 });
 
-// ── Send Email ────────────────────────────────────────
-const transporter = nodemailer.createTransport({
-  host              : "smtp.gmail.com",
-  port              : 465,
-  secure            : true,
-  auth              : {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS
-  },
-  tls               : { rejectUnauthorized: false },
-  connectionTimeout : 10000,
-  greetingTimeout   : 10000,
-  socketTimeout     : 15000
-});
+// ── Email helpers ─────────────────────────────────────
+function makeTransporter(port, secure) {
+  return nodemailer.createTransport({
+    host              : "smtp.gmail.com",
+    port,
+    secure,
+    auth              : { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
+    tls               : { rejectUnauthorized: false },
+    connectionTimeout : 12000,
+    greetingTimeout   : 12000,
+    socketTimeout     : 15000
+  });
+}
 
-app.post("/api/send-email", async (req, res) => {
-  const { toName, toEmail, ids } = req.body;
-  if (!toName || !toEmail || !ids || !ids.length)
-    return res.status(400).json({ error: "toName, toEmail and ids are required." });
-
+function buildMailOptions(toName, toEmail, ids) {
   const credLines = ids.map((id, i) =>
     `${i + 1}. Mail     : ${id.email}\n   Password : ${id.password}`
   ).join("\n\n");
 
-  const mailOptions = {
+  return {
     from   : `"Edunet Admin" <${process.env.GMAIL_USER}>`,
     to     : toEmail,
     subject: `Your ${ids.length} Edunet IBM SkillsBuild Login Credential${ids.length > 1 ? "s" : ""}`,
@@ -493,13 +489,37 @@ Edunet Admin Team`,
   </div>
 </div>`
   };
+}
 
-  try {
-    await transporter.sendMail(mailOptions);
-    res.json({ success: true, message: `Email sent to ${toEmail}` });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+// ── Send Email endpoint — tries port 465 then 587 ─────
+app.post("/api/send-email", async (req, res) => {
+  const { toName, toEmail, ids } = req.body;
+  if (!toName || !toEmail || !ids || !ids.length)
+    return res.status(400).json({ error: "toName, toEmail and ids are required." });
+
+  const mailOptions = buildMailOptions(toName, toEmail, ids);
+
+  // Try port 465 (SSL) first, then fall back to 587 (STARTTLS)
+  const attempts = [
+    { port: 465, secure: true  },
+    { port: 587, secure: false }
+  ];
+
+  let lastError = null;
+  for (const { port, secure } of attempts) {
+    try {
+      const t = makeTransporter(port, secure);
+      await t.sendMail(mailOptions);
+      console.log(`✅ Email sent via port ${port} to ${toEmail}`);
+      return res.json({ success: true, message: `Email sent to ${toEmail}` });
+    } catch (e) {
+      console.error(`❌ Port ${port} failed: ${e.message}`);
+      lastError = e;
+    }
   }
+
+  // Both ports failed — return the actual error so we can debug
+  res.status(500).json({ error: lastError.message });
 });
 
 // ── SPA fallback ──────────────────────────────────────
