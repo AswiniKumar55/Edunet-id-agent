@@ -1059,11 +1059,15 @@ function addAllocationCard(name, email, count, ids) {
     btn.textContent = "⏳ Sending…";
     const statusEl = document.getElementById("send-status-" + cardId);
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000); // 20s timeout
       const res  = await fetch("/api/send-email", {
         method : "POST",
         headers: { "Content-Type": "application/json" },
-        body   : JSON.stringify({ toName: name, toEmail: email, ids })
+        body   : JSON.stringify({ toName: name, toEmail: email, ids }),
+        signal : controller.signal
       });
+      clearTimeout(timer);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       btn.textContent = "✅ Email Sent!";

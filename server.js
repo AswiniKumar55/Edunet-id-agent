@@ -411,14 +411,17 @@ app.post("/api/ai", async (req, res) => {
 
 // ── Send Email ────────────────────────────────────────
 const transporter = nodemailer.createTransport({
-  host  : "smtp.gmail.com",
-  port  : 465,
-  secure: true,
-  auth  : {
+  host              : "smtp.gmail.com",
+  port              : 465,
+  secure            : true,
+  auth              : {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_PASS
   },
-  tls: { rejectUnauthorized: false }
+  tls               : { rejectUnauthorized: false },
+  connectionTimeout : 10000,
+  greetingTimeout   : 10000,
+  socketTimeout     : 15000
 });
 
 app.post("/api/send-email", async (req, res) => {
@@ -431,7 +434,7 @@ app.post("/api/send-email", async (req, res) => {
   ).join("\n\n");
 
   const mailOptions = {
-    from   : '"Edunet Admin" <aiaswinikumar@gmail.com>',
+    from   : `"Edunet Admin" <${process.env.GMAIL_USER}>`,
     to     : toEmail,
     subject: `Your ${ids.length} Edunet IBM SkillsBuild Login Credential${ids.length > 1 ? "s" : ""}`,
     text   :
