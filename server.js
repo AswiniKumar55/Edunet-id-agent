@@ -418,9 +418,9 @@ function makeTransporter(port, secure) {
     secure,
     auth              : { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
     tls               : { rejectUnauthorized: false },
-    connectionTimeout : 12000,
-    greetingTimeout   : 12000,
-    socketTimeout     : 15000
+    connectionTimeout : 30000,
+    greetingTimeout   : 30000,
+    socketTimeout     : 45000
   });
 }
 
