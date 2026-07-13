@@ -127,7 +127,7 @@ app.get("/api/ids", (_req, res) => res.json({ total: pool.length, pool }));
 // ── Employees ─────────────────────────────────────────
 app.get("/api/employees", (_req, res) => res.json(employees));
 
-app.post("/api/employees", (req, res) => {
+app.post("/api/employees", async (req, res) => {
   const { name, email } = req.body;
   if (!name || !email) return res.status(400).json({ error: "name and email required" });
   if (employees.find(e => e.email.toLowerCase() === email.toLowerCase()))
@@ -138,7 +138,7 @@ app.post("/api/employees", (req, res) => {
   res.json({ success: true, employee: emp });
 });
 
-app.put("/api/employees/:id", (req, res) => {
+app.put("/api/employees/:id", async (req, res) => {
   const emp = employees.find(e => e.id === parseInt(req.params.id));
   if (!emp) return res.status(404).json({ error: "Employee not found" });
   if (req.body.name)  emp.name  = req.body.name.trim();
@@ -147,7 +147,7 @@ app.put("/api/employees/:id", (req, res) => {
   res.json({ success: true, employee: emp });
 });
 
-app.delete("/api/employees/:id", (req, res) => {
+app.delete("/api/employees/:id", async (req, res) => {
   const idx = employees.findIndex(e => e.id === parseInt(req.params.id));
   if (idx === -1) return res.status(404).json({ error: "Employee not found" });
   employees.splice(idx, 1);
@@ -156,7 +156,7 @@ app.delete("/api/employees/:id", (req, res) => {
 });
 
 // ── Allocate ──────────────────────────────────────────
-app.post("/api/allocate", (req, res) => {
+app.post("/api/allocate", async (req, res) => {
   let { employeeName, employeeEmail, count, assignedBy } = req.body;
   count = parseInt(count);
   if (!employeeName || !employeeEmail || !count || count < 1)
@@ -191,7 +191,7 @@ app.post("/api/allocate", (req, res) => {
 });
 
 // ── Delete IDs with blank passwords ──────────────────
-app.post("/api/remove-blank-passwords", (req, res) => {
+app.post("/api/remove-blank-passwords", async (req, res) => {
   const { deletedBy } = req.body || {};
   const before  = pool.length;
   const nowISO  = new Date().toISOString();
@@ -224,7 +224,7 @@ app.post("/api/remove-blank-passwords", (req, res) => {
 });
 
 // ── Delete specific IDs by email ──────────────────────
-app.post("/api/delete-ids", (req, res) => {
+app.post("/api/delete-ids", async (req, res) => {
   const { emails, deletedBy } = req.body;   // array of email strings
   if (!Array.isArray(emails) || !emails.length)
     return res.status(400).json({ error: "emails array is required." });
@@ -333,7 +333,7 @@ app.get("/api/report", (req, res) => {
 });
 
 // ── Reset all ─────────────────────────────────────────
-app.post("/api/reset", (_req, res) => {
+app.post("/api/reset", async (_req, res) => {
   pool.forEach(r => { r.used=false; r.assignedTo=""; r.assignedEmail=""; r.date=""; });
   history = [];
   await saveState();
@@ -341,7 +341,7 @@ app.post("/api/reset", (_req, res) => {
 });
 
 // ── Add more IDs ──────────────────────────────────────
-app.post("/api/add-ids", (req, res) => {
+app.post("/api/add-ids", async (req, res) => {
   const { ids } = req.body;           // [{ email, password }]
   if (!Array.isArray(ids) || !ids.length)
     return res.status(400).json({ error: "ids array is required." });
@@ -374,7 +374,7 @@ app.post("/api/add-ids", (req, res) => {
 });
 
 // ── Reload Excel ──────────────────────────────────────
-app.post("/api/reload", (_req, res) => {
+app.post("/api/reload", async (_req, res) => {
   try {
     const fresh = parseExcel();
     const freshEmails = new Set(fresh.map(r => r.email.toLowerCase()));
