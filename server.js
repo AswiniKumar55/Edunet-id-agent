@@ -10,7 +10,7 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 // Serve SheetJS browser build for client-side Excel parsing
@@ -22,15 +22,42 @@ app.get("/xlsx.full.min.js", (_req, res) =>
 const EXCEL_FILE = path.join(__dirname, "Edunet ids.xlsx");
 const STATE_FILE = path.join(__dirname, "state.json");
 
+// ── Storage: Firestore (Cloud Run) or local file (dev) ──
+const USE_FIRESTORE = !!process.env.GOOGLE_CLOUD_PROJECT || !!process.env.FIRESTORE_PROJECT_ID;
+let db = null;
+
+if (USE_FIRESTORE) {
+  const { Firestore } = require("@google-cloud/firestore");
+  db = new Firestore({ projectId: process.env.FIRESTORE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT });
+  console.log("✅ Using Firestore for storage");
+} else {
+  console.log("✅ Using local state.json for storage");
+}
+
 // ── Helpers ───────────────────────────────────────────
-function loadState() {
+async function loadState() {
+  if (USE_FIRESTORE) {
+    try {
+      const doc = await db.collection("edunet").doc("state").get();
+      return doc.exists ? doc.data() : null;
+    } catch(e) { console.error("Firestore loadState error:", e.message); return null; }
+  }
+  // Local file fallback
   if (fs.existsSync(STATE_FILE)) {
     try { return JSON.parse(fs.readFileSync(STATE_FILE, "utf8")); } catch(e) {}
   }
   return null;
 }
-function saveState() {
-  fs.writeFileSync(STATE_FILE, JSON.stringify({ pool, history, employees, deletedHistory }, null, 2));
+
+async function saveState() {
+  const data = { pool, history, employees, deletedHistory };
+  if (USE_FIRESTORE) {
+    try {
+      await db.collection("edunet").doc("state").set(data);
+    } catch(e) { console.error("Firestore saveState error:", e.message); }
+    return;
+  }
+  fs.writeFileSync(STATE_FILE, JSON.stringify(data, null, 2));
 }
 
 // ── Parse Excel ───────────────────────────────────────
@@ -56,12 +83,16 @@ function parseExcel() {
   })).filter(r => r.email);
 }
 
-// ── Init ──────────────────────────────────────────────
-let saved = loadState();
-let pool           = saved ? saved.pool            : parseExcel();
-let history        = saved ? saved.history         : [];
-let employees      = saved ? (saved.employees      || []) : [];
-let deletedHistory = saved ? (saved.deletedHistory || []) : [];
+// ── Init (async — waits for Firestore on Cloud Run) ───
+let pool = [], history = [], employees = [], deletedHistory = [];
+
+async function initState() {
+  const saved = await loadState();
+  pool           = saved ? (saved.pool            || []) : parseExcel();
+  history        = saved ? (saved.history         || []) : [];
+  employees      = saved ? (saved.employees       || []) : [];
+  deletedHistory = saved ? (saved.deletedHistory  || []) : [];
+}
 
 // ═══════════════════════════════════════════════════════
 // REST API
@@ -98,7 +129,7 @@ app.post("/api/employees", (req, res) => {
     return res.status(409).json({ error: "Employee with this email already exists" });
   const emp = { id: Date.now(), name: name.trim(), email: email.trim().toLowerCase() };
   employees.push(emp);
-  saveState();
+  await saveState();
   res.json({ success: true, employee: emp });
 });
 
@@ -107,7 +138,7 @@ app.put("/api/employees/:id", (req, res) => {
   if (!emp) return res.status(404).json({ error: "Employee not found" });
   if (req.body.name)  emp.name  = req.body.name.trim();
   if (req.body.email) emp.email = req.body.email.trim().toLowerCase();
-  saveState();
+  await saveState();
   res.json({ success: true, employee: emp });
 });
 
@@ -115,7 +146,7 @@ app.delete("/api/employees/:id", (req, res) => {
   const idx = employees.findIndex(e => e.id === parseInt(req.params.id));
   if (idx === -1) return res.status(404).json({ error: "Employee not found" });
   employees.splice(idx, 1);
-  saveState();
+  await saveState();
   res.json({ success: true });
 });
 
@@ -150,7 +181,7 @@ app.post("/api/allocate", (req, res) => {
     ids        : allocated.map(x => ({ email: x.email, password: x.password }))
   };
   history.unshift(entry);
-  saveState();
+  await saveState();
   res.json({ success: true, allocated: entry.ids, entry });
 });
 
@@ -183,7 +214,7 @@ app.post("/api/remove-blank-passwords", (req, res) => {
     r.password && r.password.toString().trim() !== ""
   );
   pool.forEach((r, i) => { r.sno = i + 1; });
-  saveState();
+  await saveState();
   res.json({ success: true, removed: before - pool.length, total: pool.length });
 });
 
@@ -217,7 +248,7 @@ app.post("/api/delete-ids", (req, res) => {
 
   pool = pool.filter(r => !set.has((r.email||"").toLowerCase()));
   pool.forEach((r, i) => { r.sno = i + 1; });
-  saveState();
+  await saveState();
   res.json({ success: true, removed: before - pool.length, total: pool.length });
 });
 
@@ -300,7 +331,7 @@ app.get("/api/report", (req, res) => {
 app.post("/api/reset", (_req, res) => {
   pool.forEach(r => { r.used=false; r.assignedTo=""; r.assignedEmail=""; r.date=""; });
   history = [];
-  saveState();
+  await saveState();
   res.json({ success: true });
 });
 
@@ -333,7 +364,7 @@ app.post("/api/add-ids", (req, res) => {
 
   // Re-number sno for the whole pool
   pool.forEach((r, i) => { r.sno = i + 1; });
-  saveState();
+  await saveState();
   res.json({ success: true, added, skipped, total: pool.length });
 });
 
@@ -363,7 +394,7 @@ app.post("/api/reload", (_req, res) => {
     // 4. Re-number sno
     pool.forEach((r, i) => { r.sno = i + 1; });
 
-    saveState();
+    await saveState();
     res.json({ success: true, total: pool.length });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -492,7 +523,14 @@ app.get("*", (_req, res) =>
   res.sendFile(path.join(__dirname, "public", "index.html"))
 );
 
-app.listen(PORT, () => {
-  console.log(`\n✅  Edunet ID Agent  →  http://localhost:${PORT}`);
-  console.log(`   Pool : ${pool.length} IDs   |   Employees : ${employees.length}`);
+// ── Start server after state is loaded ────────────────
+initState().then(() => {
+  app.listen(PORT, () => {
+    console.log(`\n✅  Edunet ID Agent  →  http://localhost:${PORT}`);
+    console.log(`   Pool : ${pool.length} IDs   |   Employees : ${employees.length}`);
+    console.log(`   Storage: ${USE_FIRESTORE ? "Firestore ☁️" : "Local file 📁"}`);
+  });
+}).catch(e => {
+  console.error("❌ Failed to init state:", e.message);
+  process.exit(1);
 });

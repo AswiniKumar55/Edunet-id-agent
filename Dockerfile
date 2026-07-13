@@ -1,14 +1,8 @@
 FROM node:20-slim
-
 WORKDIR /app
-
 COPY package*.json ./
-RUN npm install --production
-
+RUN npm install --omit=dev
 COPY . .
-
-EXPOSE 7860
-
-ENV PORT=7860
-
+EXPOSE 8080
+ENV PORT=8080
 CMD ["node", "server.js"]
