@@ -1,0 +1,5 @@
+node_modules
+.git
+.bob
+~$Edunet ids.xlsx
+*.log
