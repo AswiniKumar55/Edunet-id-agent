@@ -5,6 +5,7 @@ const cors       = require("cors");
 const fs         = require("fs");
 const path       = require("path");
 const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -495,7 +496,27 @@ app.post("/api/send-email", async (req, res) => {
   </div>
 </div>`;
 
-  // Try ports 465 (SSL) and 587 (TLS) — fallback between them
+  // ── Try Resend first (HTTPS, no port blocking) ──
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const from = process.env.RESEND_FROM || `Edunet Admin <onboarding@resend.dev>`;
+      await resend.emails.send({
+        from,
+        to     : toEmail,
+        subject: `Your ${ids.length} Edunet IBM SkillsBuild Login Credential${ids.length > 1 ? "s" : ""}`,
+        html,
+        text   : `Dear ${toName},\n\nYour credentials:\n\n${credLines}\n\nLogin: https://www.edunetworks.in/\n\nEdunet Admin Team`
+      });
+      console.log("✅ Email sent via Resend to", toEmail);
+      return res.json({ success: true, message: `Email sent to ${toEmail}` });
+    } catch (e) {
+      console.error("❌ Resend failed:", e.message);
+      return res.status(500).json({ error: `Resend error: ${e.message}` });
+    }
+  }
+
+  // ── Fallback: SMTP via nodemailer (ports 465 / 587) ──
   const configs = [
     { port: 465, secure: true },
     { port: 587, secure: false }
@@ -523,19 +544,15 @@ app.post("/api/send-email", async (req, res) => {
         text   : `Dear ${toName},\n\nYour credentials:\n\n${credLines}\n\nLogin: https://www.edunetworks.in/\n\nEdunet Admin Team`
       });
 
-      console.log(`✅ Email sent via port ${port} to`, toEmail);
+      console.log(`✅ Email sent via SMTP port ${port} to`, toEmail);
       return res.json({ success: true, message: `Email sent to ${toEmail}` });
     } catch (e) {
       lastError = e.message;
-      console.error(`❌ Port ${port} failed:`, e.message);
+      console.error(`❌ SMTP port ${port} failed:`, e.message);
     }
   }
 
-  // Both SMTP ports failed — likely blocked by ISP/network
-  // Suggest user to check Gmail App Password or network
-  res.status(500).json({
-    error: `Email failed on all ports. Possible causes:\n1. Gmail App Password is incorrect\n2. SMTP ports (465/587) are blocked by your network/ISP\n3. Less secure app access is disabled\n\nLast error: ${lastError}`
-  });
+  res.status(500).json({ error: `All email methods failed. Last error: ${lastError}` });
 });
 
 // ── SPA fallback ──────────────────────────────────────
