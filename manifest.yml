@@ -1,0 +1,16 @@
+applications:
+  - name: edunet-id-agent
+    memory: 256M
+    instances: 1
+    buildpack: nodejs_buildpack
+    command: node server.js
+    env:
+      IBM_API_KEY: FnrMnSyPAzOx2Y3-SNtvV_NG5oWAqn8Ed2_0twbkqII9
+      IBM_PROJECT_ID: eb56b99d-2986-4025-905d-3ea065ab3186
+      IBM_WX_URL: https://us-south.ml.cloud.ibm.com
+      IBM_MODEL: ibm/granite-3-3-8b-instruct
+      GMAIL_USER: aiaswinikumar@gmail.com
+      GMAIL_PASS: pcdodjtvnhlfgxmp
+      ADMIN_USER: admin
+      ADMIN_PASS: admin123
+      PORT: 8080
