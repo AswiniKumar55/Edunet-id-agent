@@ -101,13 +101,18 @@ async function initState() {
 // ── Admin login (credentials validated server-side) ───
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
-  const ADMIN_USER = process.env.ADMIN_USER || "admin";
-  const ADMIN_PASS = process.env.ADMIN_PASS || "admin123";
+  const ADMIN_USER  = process.env.ADMIN_USER  || "admin";
+  const ADMIN_PASS  = process.env.ADMIN_PASS  || "admin123";
+  const ADMIN_USER2 = process.env.ADMIN_USER2 || "aiaswinikumar@gmail.com";
+  const ADMIN_PASS2 = process.env.ADMIN_PASS2 || "Edunet@12345";
+
   if (username === ADMIN_USER && password === ADMIN_PASS) {
-    res.json({ success: true, displayName: ADMIN_USER });
-  } else {
-    res.status(401).json({ error: "Invalid credentials." });
+    return res.json({ success: true, displayName: "Admin" });
   }
+  if (username === ADMIN_USER2 && password === ADMIN_PASS2) {
+    return res.json({ success: true, displayName: "Aiaswini Kumar" });
+  }
+  res.status(401).json({ error: "Invalid credentials." });
 });
 
 // Stats

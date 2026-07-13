@@ -21,8 +21,10 @@ EXCEL_FILE  = Path("Edunet ids.xlsx")
 STATE_FILE  = Path("state.json")
 PUBLIC_DIR  = Path("public")
 
-ADMIN_USER  = os.getenv("ADMIN_USER", "admin")
-ADMIN_PASS  = os.getenv("ADMIN_PASS", "admin123")
+ADMIN_USER  = os.getenv("ADMIN_USER",  "admin")
+ADMIN_PASS  = os.getenv("ADMIN_PASS",  "admin123")
+ADMIN_USER2 = os.getenv("ADMIN_USER2", "aiaswinikumar@gmail.com")
+ADMIN_PASS2 = os.getenv("ADMIN_PASS2", "Edunet@12345")
 GMAIL_USER  = os.getenv("GMAIL_USER", "")
 GMAIL_PASS  = os.getenv("GMAIL_PASS", "")
 IBM_API_KEY = os.getenv("IBM_API_KEY", "")
@@ -153,7 +155,9 @@ class SendEmailBody(BaseModel):
 @app.post("/api/login")
 def login(body: LoginBody):
     if body.username == ADMIN_USER and body.password == ADMIN_PASS:
-        return {"success": True, "displayName": ADMIN_USER}
+        return {"success": True, "displayName": "Admin"}
+    if body.username == ADMIN_USER2 and body.password == ADMIN_PASS2:
+        return {"success": True, "displayName": "Aiaswini Kumar"}
     raise HTTPException(401, "Invalid credentials.")
 
 @app.get("/api/stats")

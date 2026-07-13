@@ -4,7 +4,6 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Edunet ID Agent</title>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.6;background:#f0f2f5;color:#1f2328}
@@ -193,33 +192,11 @@ footer{text-align:center;font-size:12px;color:#9ca3af;padding:12px;border-top:1p
   </div>
   <h1>Edunet ID Agent</h1>
   <p>Admin portal — sign in to manage &amp; allocate credentials</p>
-  <input type="text"     id="l-user" placeholder="Username" value="admin" autocomplete="username"/>
+  <input type="text"     id="l-user" placeholder="Username or Email" autocomplete="username"/>
   <input type="password" id="l-pass" placeholder="Password"
          onkeydown="if(event.key==='Enter')login()" autocomplete="current-password"/>
   <button class="btn btn-primary btn-full" onclick="login()" style="margin-top:4px">Sign In →</button>
-  <div style="display:flex;align-items:center;gap:8px;margin:14px 0 10px">
-    <div style="flex:1;height:1px;background:#e5e7eb"></div>
-    <span style="font-size:11px;color:#9ca3af">or sign in with</span>
-    <div style="flex:1;height:1px;background:#e5e7eb"></div>
-  </div>
-  <!-- Google Sign-In — captures real name for "Assigned By" in reports -->
-  <div id="g_id_onload"
-       data-client_id="986906180547-6lmlknb4dh4gc1njdpetge0uvlf5bogi.apps.googleusercontent.com"
-       data-callback="handleGoogleLogin"
-       data-auto_select="false"
-       data-itp_support="true">
-  </div>
-  <div class="g_id_signin"
-       data-type="standard"
-       data-shape="rectangular"
-       data-theme="outline"
-       data-text="signin_with"
-       data-size="large"
-       data-logo_alignment="left"
-       style="display:flex;justify-content:center">
-  </div>
   <div class="login-err" id="l-err"></div>
-  <p class="login-hint">Google login captures your real name for reports.</p>
 </div>
 </div>
 
@@ -612,27 +589,6 @@ async function login() {
     }
   } catch(e) {
     document.getElementById("l-err").textContent = "Server error. Try again.";
-  }
-}
-
-// ── Google Sign-In callback ───────────────────────────
-function handleGoogleLogin(response) {
-  try {
-    // Decode JWT payload (no library needed — just base64 decode middle part)
-    const payload = JSON.parse(atob(response.credential.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
-    const name    = payload.name  || payload.email || "Google User";
-    const email   = payload.email || "";
-    // Only allow your specific admin Google account — change this to your Gmail
-    const ALLOWED = "aiaswinikumar@gmail.com";
-    if (email.toLowerCase() !== ALLOWED.toLowerCase()) {
-      document.getElementById("l-err").textContent = "❌ This Google account is not authorised.";
-      return;
-    }
-    loggedInUser = name;   // e.g. "Aiaswini Kumar" — shows in reports as Assigned By
-    localStorage.setItem("edunet_session", JSON.stringify({ user: name }));
-    enterApp(name);
-  } catch(e) {
-    document.getElementById("l-err").textContent = "Google login failed. Try username/password.";
   }
 }
 
