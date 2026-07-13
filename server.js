@@ -495,32 +495,47 @@ app.post("/api/send-email", async (req, res) => {
   </div>
 </div>`;
 
-  // ── Get Gmail IAM token via fetch (HTTPS only — works on Render) ──
-  try {
-    // Step 1: Get OAuth2 token from Google using App Password via nodemailer service shortcut
-    const transporter = nodemailer.createTransport({
-      service          : "gmail",
-      auth             : { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
-      tls              : { rejectUnauthorized: false },
-      connectionTimeout: 30000,
-      greetingTimeout  : 30000,
-      socketTimeout    : 45000
-    });
+  // Try ports 465 (SSL) and 587 (TLS) — fallback between them
+  const configs = [
+    { port: 465, secure: true },
+    { port: 587, secure: false }
+  ];
 
-    await transporter.sendMail({
-      from   : `"Edunet Admin" <${process.env.GMAIL_USER}>`,
-      to     : toEmail,
-      subject: `Your ${ids.length} Edunet IBM SkillsBuild Login Credential${ids.length > 1 ? "s" : ""}`,
-      html,
-      text   : `Dear ${toName},\n\nYour credentials:\n\n${credLines}\n\nLogin: https://www.edunetworks.in/\n\nEdunet Admin Team`
-    });
+  let lastError = "";
+  for (const { port, secure } of configs) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host            : "smtp.gmail.com",
+        port,
+        secure,
+        auth            : { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
+        tls             : { rejectUnauthorized: false },
+        connectionTimeout: 10000,
+        greetingTimeout : 10000,
+        socketTimeout   : 15000
+      });
 
-    console.log("✅ Email sent via Gmail to", toEmail);
-    res.json({ success: true, message: `Email sent to ${toEmail}` });
-  } catch (e) {
-    console.error("❌ Gmail error:", e.message);
-    res.status(500).json({ error: e.message });
+      await transporter.sendMail({
+        from   : `"Edunet Admin" <${process.env.GMAIL_USER}>`,
+        to     : toEmail,
+        subject: `Your ${ids.length} Edunet IBM SkillsBuild Login Credential${ids.length > 1 ? "s" : ""}`,
+        html,
+        text   : `Dear ${toName},\n\nYour credentials:\n\n${credLines}\n\nLogin: https://www.edunetworks.in/\n\nEdunet Admin Team`
+      });
+
+      console.log(`✅ Email sent via port ${port} to`, toEmail);
+      return res.json({ success: true, message: `Email sent to ${toEmail}` });
+    } catch (e) {
+      lastError = e.message;
+      console.error(`❌ Port ${port} failed:`, e.message);
+    }
   }
+
+  // Both SMTP ports failed — likely blocked by ISP/network
+  // Suggest user to check Gmail App Password or network
+  res.status(500).json({
+    error: `Email failed on all ports. Possible causes:\n1. Gmail App Password is incorrect\n2. SMTP ports (465/587) are blocked by your network/ISP\n3. Less secure app access is disabled\n\nLast error: ${lastError}`
+  });
 });
 
 // ── SPA fallback ──────────────────────────────────────
