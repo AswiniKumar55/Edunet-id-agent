@@ -9,3 +9,10 @@ services:
         value: 3000
       - key: NODE_ENV
         value: production
+      # ── Persistent storage (required on Render free tier) ──
+      # Without these, all employee/allocation data is lost when the
+      # service sleeps and restarts. Get free credentials at jsonbin.io
+      - key: JSONBIN_KEY
+        sync: false   # set manually in Render dashboard (X-Master-Key)
+      - key: JSONBIN_BIN
+        sync: false   # set manually in Render dashboard (Bin ID)

@@ -23,27 +23,52 @@ app.get("/xlsx.full.min.js", (_req, res) =>
 const EXCEL_FILE = path.join(__dirname, "Edunet ids.xlsx");
 const STATE_FILE = path.join(__dirname, "state.json");
 
-// ── Storage: Firestore (Cloud Run) or local file (dev) ──
+// ── Storage: Firestore → JSONBin → local file ─────────
+// Priority: Firestore (GCP) > JSONBin (Render free) > local file (dev)
 const USE_FIRESTORE = !!process.env.GOOGLE_CLOUD_PROJECT || !!process.env.FIRESTORE_PROJECT_ID;
+const JSONBIN_KEY   = process.env.JSONBIN_KEY   || "";   // X-Master-Key from jsonbin.io
+const JSONBIN_BIN   = process.env.JSONBIN_BIN   || "";   // Bin ID from jsonbin.io
+const USE_JSONBIN   = !USE_FIRESTORE && !!JSONBIN_KEY && !!JSONBIN_BIN;
+
 let db = null;
 
 if (USE_FIRESTORE) {
   const { Firestore } = require("@google-cloud/firestore");
   db = new Firestore({ projectId: process.env.FIRESTORE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT });
   console.log("✅ Using Firestore for storage");
+} else if (USE_JSONBIN) {
+  console.log("✅ Using JSONBin for persistent storage (Render-safe)");
 } else {
-  console.log("✅ Using local state.json for storage");
+  console.log("⚠️  Using local state.json — data will reset on Render sleep/restart.");
+  console.log("   → Set JSONBIN_KEY + JSONBIN_BIN env vars on Render for persistence.");
 }
 
 // ── Helpers ───────────────────────────────────────────
 async function loadState() {
+  // 1. Firestore (Cloud Run / GCP)
   if (USE_FIRESTORE) {
     try {
       const doc = await db.collection("edunet").doc("state").get();
       return doc.exists ? doc.data() : null;
     } catch(e) { console.error("Firestore loadState error:", e.message); return null; }
   }
-  // Local file fallback
+
+  // 2. JSONBin (free external KV — survives Render sleep)
+  if (USE_JSONBIN) {
+    try {
+      const r = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN}/latest`, {
+        headers: { "X-Master-Key": JSONBIN_KEY }
+      });
+      if (r.ok) {
+        const j = await r.json();
+        return j.record || null;
+      }
+      console.error("JSONBin loadState HTTP", r.status);
+    } catch(e) { console.error("JSONBin loadState error:", e.message); }
+    return null;
+  }
+
+  // 3. Local file (dev / ephemeral — last resort)
   if (fs.existsSync(STATE_FILE)) {
     try { return JSON.parse(fs.readFileSync(STATE_FILE, "utf8")); } catch(e) {}
   }
@@ -52,12 +77,31 @@ async function loadState() {
 
 async function saveState() {
   const data = { pool, history, employees, deletedHistory };
+
+  // 1. Firestore
   if (USE_FIRESTORE) {
     try {
       await db.collection("edunet").doc("state").set(data);
     } catch(e) { console.error("Firestore saveState error:", e.message); }
     return;
   }
+
+  // 2. JSONBin
+  if (USE_JSONBIN) {
+    try {
+      const r = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN}`, {
+        method : "PUT",
+        headers: { "Content-Type": "application/json", "X-Master-Key": JSONBIN_KEY },
+        body   : JSON.stringify(data)
+      });
+      if (!r.ok) console.error("JSONBin saveState HTTP", r.status, await r.text());
+    } catch(e) { console.error("JSONBin saveState error:", e.message); }
+    // Also write local file as hot-cache so reads during the same session are instant
+    try { fs.writeFileSync(STATE_FILE, JSON.stringify(data, null, 2)); } catch(_) {}
+    return;
+  }
+
+  // 3. Local file
   fs.writeFileSync(STATE_FILE, JSON.stringify(data, null, 2));
 }
 
